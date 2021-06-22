@@ -1,0 +1,7 @@
+pdfreader
+oletools
+cryptography
+zipfile38
+msoffcrypto-tool
+olefile
+yara-python
