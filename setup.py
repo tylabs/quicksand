@@ -12,7 +12,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/tylabs/quicksand",
-    download_url="https://github.com/tylabs/quicksand/archive/refs/tags/2.0.7.tar.gz",
+    download_url="https://github.com/tylabs/quicksand/archive/refs/tags/2.0.8.tar.gz",
     include_package_data=True,
     keywords = ['document', 'malware', 'forensics', 'yara', 'parser'],
     project_urls={
