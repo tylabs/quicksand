@@ -41,7 +41,7 @@ import traceback
 import tempfile
 
 class quicksand:
-    __version__ = '2.0.7'
+    __version__ = '2.0.8'
     
     try:
         exploityara = str(os.path.dirname(__file__)) + '/quicksand_exploits.yara'
