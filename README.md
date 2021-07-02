@@ -2,22 +2,30 @@
 
 QuickSand.io Python Library and Command Line Tool
 
+QuickSand is a Python-based analysis framework to analyze suspected malware documents to identify exploits in streams of different encodings or compressions. QuickSand supports documents, PDFs, Mime/Email, Postscript and other common formats. 
+
+QuickSand supports scanning using Yara signatures within the decoded streams of documents and PDFs to identify exploits or high risk active content.
+
+A hosted version is available to try without any installation at [quicksand.io](https://quicksand.io/).
+
 
 ## Files:
 
-- quicksand.py: Main quicksand class and CLI tool
+- src/quicksand/quicksand.py: Main quicksand class and CLI tool
 
-- quicksand_exe.yara: Yara rules to detect executables.
+- src/quicksand/quicksand_exe.yara: Yara rules to detect executables.
 
-- quicksand_exploits.yara: Yara rules to detect exploits in documents.
+- src/quicksand/quicksand_exploits.yara: Yara rules to detect exploits in documents.
 
-- quicksand_pdf.yara: Yara rules to detect exploits in PDFs.
+- src/quicksand/quicksand_pdf.yara: Yara rules to detect exploits in PDFs.
 
-- requirements.txt: pip dependancies 
+- bin/quicksand: Command line tool.
 
-- Dockerfile for building an Amazon Lambda environment
+- requirements.txt: pip dependencies 
 
-- helper script for building Amazon Lambda environment
+- lambda/Dockerfile for building an Amazon Lambda environment
+
+- lambda/wait.py helper script for building Amazon Lambda environment
 
 
 
@@ -54,6 +62,9 @@ pip3 install --upgrade quicksand
 
 
 ## Usage CLI
+
+A command line tool for quicksand to process and output json results is included. More features and pretty output will be added soon.
+
 
 ### Single file
 
