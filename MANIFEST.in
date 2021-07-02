@@ -1,0 +1,3 @@
+include src/quicksand/quicksand_exe.yara
+include src/quicksand/quicksand_exploits.yara
+include src/quicksand/quicksand_pdf.yara

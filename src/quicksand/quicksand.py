@@ -44,9 +44,9 @@ class quicksand:
     __version__ = '2.0.7'
     
     try:
-        exploityara = str(os.path.dirname(os.path.realpath(__file__))) + '/quicksand_exploits.yara'
-        execyara = str(os.path.dirname(os.path.realpath(__file__))) + '/quicksand_exe.yara'
-        pdfyara = str(os.path.dirname(os.path.realpath(__file__))) + '/quicksand_pdf.yara'
+        exploityara = str(os.path.dirname(__file__)) + '/quicksand_exploits.yara'
+        execyara = str(os.path.dirname(__file__)) + '/quicksand_exe.yara'
+        pdfyara = str(os.path.dirname(__file__)) + '/quicksand_pdf.yara'
 
     except:
         exploityara = 'quicksand_exploits.yara'
@@ -979,28 +979,3 @@ class quicksand:
         else:
             return "data"
 
-
-
-
-
-def main(args=None):
-    if args is None:
-        args = sys.argv[1:]
-
-    if len(args) == 0:
-       print("Usage: Specify a file or directory to process. python quicksand.py file.doc")
-       sys.exit(1)
-
-    if os.path.isfile(args[0]):
-        qs = quicksand(args[0])
-        qs.process()
-        print (qs.results)
-    elif os.path.isdir(args[0]):
-        print(quicksand.readDir(args[0]))
-
-    return args
-        
-if __name__ == "__main__":
-    main()
-
-    

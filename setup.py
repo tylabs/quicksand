@@ -13,6 +13,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/tylabs/quicksand",
     download_url="https://github.com/tylabs/quicksand/archive/refs/tags/2.0.7.tar.gz",
+    include_package_data=True,
     keywords = ['document', 'malware', 'forensics', 'yara', 'parser'],
     project_urls={
         "Bug Tracker": "https://github.com/tylabs/quicksand/issues",
@@ -24,6 +25,7 @@ setuptools.setup(
     ],
     package_dir={"": "src"},
     packages=['quicksand'],
+    scripts=['bin/quicksand'],
     python_requires=">=3.6",
     install_requires=['pdfreader',
         'oletools',

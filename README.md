@@ -20,10 +20,6 @@ QuickSand.io Python Library and Command Line Tool
 - helper script for building Amazon Lambda environment
 
 
-## Requirements
-
-`pip3 install -r requirements.txt`
-
 
 ### Python modules
 
@@ -46,20 +42,22 @@ We recommend you installing yara-python from source as the pip builds on some op
 
 ## Install
 
-
+```
+pip3 install quicksand
+```
 
 ## Usage CLI
 
 ### Single file
 
 ```
-python3 quicksand.py document.doc
+quicksand document.doc
 ```
 
 ### Directory of Files
 
 ```
-python3 quicksand.py malware/
+quicksand malware/
 ```
 
 ## Usage Python Module
@@ -67,7 +65,7 @@ python3 quicksand.py malware/
 ### File from memory
 
 ```
-from quicksand import quicksand
+from quicksand.quicksand import quicksand
 import pprint
 
 qs = quicksand(data, timeout=18, strings=True)
@@ -78,7 +76,7 @@ pprint.pprint(qs.results)
 ### Filename
 
 ```
-from quicksand import quicksand
+from quicksand.quicksand import quicksand
 
 qs2 = quicksand("file.doc")
 qs2.process()
@@ -88,7 +86,7 @@ qs.results
 ### Process a Directory
 
 ```
-from quicksand import quicksand
+from quicksand.quicksand import quicksand
 qs = quicksand.readDir("malware")
 qs
 ```
@@ -98,7 +96,7 @@ Returns a dictionary of filename: `qs_results`.
 ### Extract Streams As Files
 
 ```
-from quicksand import quicksand
+from quicksand.quicksand import quicksand
 import os
 
 qs = quicksand("malware.doc", capture=True, debug=True)
@@ -133,13 +131,13 @@ Writes extracted streams to ./tmp.
 
 ### Jupyter Notes
 
-Python won't be able to figure out the path to the yara signatures on it's own in Jupyter. You can either copy the yara files to the working directory with the .ipynb file, or provide the paths at run time:
+Python might not be able to figure out the path to the yara signatures on it's own in Jupyter. You can either copy the yara files to the working directory with the .ipynb file, or provide the paths at run time:
 
 ```
-from quicksand_release.quicksand import quicksand
+from quicksand.quicksand import quicksand
 import os
 
-qs = quicksand("malware/7ab0d0424eb9d655c0ee6d4a23473abf0c875892745336cb17fba7274dfe11a4", capture=True, debug=True, exploityara="/Users/user/Documents/GitHub/jupyter/quicksand_release/quicksand_exploits.yara", pdfyara="/Users/user/Documents/GitHub/jupyter/quicksand_release/quicksand_pdf.yara",execyara="/Users/user/Documents/GitHub/jupyter/quicksand_release/quicksand_exe.yara" )
+qs = quicksand("malware/7ab0d0424eb9d655c0ee6d4a23473abf0c875892745336cb17fba7274dfe11a4", capture=True, debug=True, exploityara="/Users/user/Documents/GitHub/jupyter/quicksand/quicksand_exploits.yara", pdfyara="/Users/user/Documents/GitHub/jupyter/quicksand/quicksand_pdf.yara",execyara="/Users/user/Documents/GitHub/jupyter/quicksand_/quicksand_exe.yara" )
 qs.process()
 print (qs.results)
 ````
