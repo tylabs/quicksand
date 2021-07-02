@@ -40,11 +40,18 @@ QuickSand.io Python Library and Command Line Tool
 
 We recommend you installing yara-python from source as the pip builds on some operating systems might not be fully functional (hash module in particular.)
 
-## Install
+## Install from Pypi
 
 ```
 pip3 install quicksand
 ```
+
+## Upgrade
+
+```
+pip3 install --upgrade quicksand
+```
+
 
 ## Usage CLI
 
