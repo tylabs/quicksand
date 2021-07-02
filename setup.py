@@ -7,7 +7,7 @@ setuptools.setup(
     name="quicksand",
     version="2.0.8",
     author="Tyler McLellan",
-    author_email="ty@tylabs.org",
+    author_email="nospam@tylabs.com",
     description="QuickSand is a module to scan streams inside documents with Yara",
     long_description=long_description,
     long_description_content_type="text/markdown",
