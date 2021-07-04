@@ -3,21 +3,124 @@
 from quicksand.quicksand import quicksand
 import os.path
 import sys
+import argparse
+import json
+
+__version__ = '2.0.9'
+__author__ = "Tyler McLellan"
+__copyright__ = "Copyright 2021, @tylabs"
+__license__ = "MIT"
+
+
+
+# fix for bytes from https://stackoverflow.com/questions/57014259/json-dumps-on-dictionary-with-bytes-for-keys
+# your dump code for values, unmodified
+class BytesDump(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, bytes):
+            return obj.decode()
+        return json.JSONEncoder.default(self, obj)
+
+# recursive key as string conversion for byte keys
+def keys_string(d):
+    rval = {}
+    if not isinstance(d, dict):
+        if isinstance(d,(tuple,list,set)):
+            v = [keys_string(x) for x in d]
+            return v
+        else:
+            return d
+
+    for k,v in d.items():
+        if isinstance(k,bytes):
+            k = k.decode()
+        if isinstance(v,dict):
+            v = keys_string(v)
+        elif isinstance(v,(tuple,list,set)):
+            v = [keys_string(x) for x in v]
+        rval[k] = v
+    return rval
+
+
+def txtOut(results):
+    out = "QuickSand Results " + str(results['version']) +  "\n\nMETADATA\n\n"
+    out += "{:<20}: {}".format("filename", results['filename']) + "\n"
+    out += "{:<20}: {}".format("type", results['type']) + "\n"
+    out += "{:<20}: {}".format("md5", results['md5']) + "\n"
+    out += "{:<20}: {}".format("sha1", results['sha1']) + "\n"
+    out += "{:<20}: {}".format("sha256", results['sha256']) + "\n"
+    out += "{:<20}: {}".format("size", results['size']) + "\n"
+    out += "\n"
+    out += "{:<20}: {}".format("started", results['started']) + "\n"
+    out += "{:<20}: {}".format("finished", results['finished']) + "\n"
+    out += "{:<20}: {}".format("elapsed", results['elapsed']) + "\n"
+    out += "\n\nSIMILARITY "+ str(results['structhash_version']) + "\n\n"
+    out += "{:<20}: {}".format("structhash", results['structhash']) + "\n"
+    out += "{:<20}: {}".format("struzzy", results['struzzy']) + "\n"
+    out += "{:<20}: {}".format("header", results['header']) + "\n"
+    out += "\n\nRESULT\n\n"
+    out += "{:<20}: {}".format("risk", results['risk']) + "\n"
+    out += "{:<20}: {}".format("score", results['score']) + "\n\n"
+    out += json.dumps(keys_string(results['results']), cls=BytesDump,sort_keys=True, indent=4) + "\n"
+    return out
 
 def main(args=None):
-    if args is None:
-        args = sys.argv[1:]
 
-    if len(args) == 0:
-       print("Usage: Specify a file or directory to process. quicksand file.doc")
-       sys.exit(1)
+    parser = argparse.ArgumentParser(description='QuickSand Document and PDF maldoc analysis tool.')
+    parser.add_argument('document', type=str, help='document or directory to scan')
 
-    if os.path.isfile(args[0]):
-        qs = quicksand(args[0])
+    parser.add_argument("-v", "--verbose", help="increase output verbosity",
+                    action="store_true")
+    parser.add_argument("-c", "--capture", help="capture stream content",
+                    action="store_true")
+    parser.add_argument("-y", "--yara", help="capture yara matched strings",
+                    action="store_true")
+    parser.add_argument("-t", "--timeout", help="timeout in seconds", default=0,
+                    type=int)
+    parser.add_argument("-e", "--exploit", help="yara exploit signatures", default=None, type=str)
+    parser.add_argument("-x", "--exe", help="yara executable signatures", default=None, type=str)
+    parser.add_argument("-p", "--pdf", help="yara PDF signatures", default=None, type=str)
+    parser.add_argument("-f", "--format", help="output format", type=str,
+        choices=['json', 'txt'], default='json')
+    parser.add_argument("-o", "--out", help="save output to this filename", default=None, type=str)
+ 
+    args = parser.parse_args()
+
+    if os.path.isfile(args.document):
+        qs = quicksand(args.document, debug=args.verbose, capture=args.capture, strings=args.yara,
+            timeout=args.timeout, exploityara=args.exploit, execyara=args.exe, pdfyara=args.pdf)
         qs.process()
-        print (qs.results)
-    elif os.path.isdir(args[0]):
-        print(quicksand.readDir(args[0]))
+        if args.out:
+            with open(args.out, 'w') as outfile:
+                if args.format == 'json':
+                    json.dump(keys_string(qs.results), outfile, cls=BytesDump,sort_keys=True, indent=4)
+                else:
+                    outfile.write(txtOut(qs.results))
+        else:
+            if args.format == 'json':
+                print (json.dumps(keys_string(qs.results), cls=BytesDump,sort_keys=True, indent=4))
+            else:
+               print(txtOut(qs.results))
+ 
+    elif os.path.isdir(args.document):
+        out = quicksand.readDir(args.document,debug=args.verbose, capture=args.capture, strings=args.yara,
+            timeout=args.timeout, exploityara=args.exploit, execyara=args.exe, pdfyara=args.pdf)
+
+
+        if args.out:
+            with open(args.out, 'w') as outfile:
+                if args.format == 'json':
+                    json.dump(keys_string(out), outfile, cls=BytesDump,sort_keys=True, indent=4)
+                else:
+                    for doc in out:
+                        outfile.write(txtOut(out[doc]))
+        else:
+            if args.format == 'json':
+                print(json.dumps(keys_string(out), outfile, cls=BytesDump,sort_keys=True, indent=4))
+            else:
+                for doc in out:
+                    print(txtOut(out[doc]))
+                    print("\n\n")
 
     return args
         

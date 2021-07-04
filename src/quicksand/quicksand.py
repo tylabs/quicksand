@@ -41,7 +41,10 @@ import traceback
 import tempfile
 
 class quicksand:
-    __version__ = '2.0.8'
+    __version__ = '2.0.9'
+    __author__ = "Tyler McLellan"
+    __copyright__ = "Copyright 2021, @tylabs"
+    __license__ = "MIT"
     
     try:
         exploityara = str(os.path.dirname(__file__)) + '/quicksand_exploits.yara'
@@ -67,13 +70,13 @@ class quicksand:
             self.msg("ERROR: file not found")
             return b''
     
-    def readDir(directory):
+    def readDir(directory,capture=False,strings=True, debug=False, timeout=0, exploityara=None, execyara=None,pdfyara=None):
         out = {}
         for f in listdir(directory):
             fname = join(directory, f)
             if isfile(fname):
-                print (fname)
-                q = quicksand(fname)
+                #print (fname)
+                q = quicksand(fname,capture=False,strings=True, debug=False, timeout=0, exploityara=None, execyara=None,pdfyara=None)
                 q.process()
                 out[fname] = q.results
         return out

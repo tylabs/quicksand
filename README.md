@@ -63,8 +63,31 @@ pip3 install --upgrade quicksand
 
 ## Usage CLI
 
-A command line tool for quicksand to process and output json results is included. More features and pretty output will be added soon.
+A command line tool for quicksand to process and output json or txt results.
 
+
+```usage: quicksand [-h] [-v] [-c] [-y] [-t TIMEOUT] [-e EXPLOIT] [-x EXE] [-p PDF] [-f {json,txt}] [-o OUT] document
+
+QuickSand Document and PDF maldoc analysis tool.
+
+positional arguments:
+  document              document or directory to scan
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --verbose         increase output verbosity
+  -c, --capture         capture stream content
+  -y, --yara            capture yara matched strings
+  -t TIMEOUT, --timeout TIMEOUT
+                        timeout in seconds
+  -e EXPLOIT, --exploit EXPLOIT
+                        yara exploit signatures
+  -x EXE, --exe EXE     yara executable signatures
+  -p PDF, --pdf PDF     yara PDF signatures
+  -f {json,txt}, --format {json,txt}
+                        output format
+  -o OUT, --out OUT     save output to this filename
+```
 
 ### Single file
 
