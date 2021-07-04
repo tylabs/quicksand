@@ -6,7 +6,7 @@ import sys
 import argparse
 import json
 
-__version__ = '2.0.9'
+__version__ = '2.0.10'
 __author__ = "Tyler McLellan"
 __copyright__ = "Copyright 2021, @tylabs"
 __license__ = "MIT"
@@ -116,7 +116,7 @@ def main(args=None):
                         outfile.write(txtOut(out[doc]))
         else:
             if args.format == 'json':
-                print(json.dumps(keys_string(out), outfile, cls=BytesDump,sort_keys=True, indent=4))
+                print(json.dumps(keys_string(out), cls=BytesDump,sort_keys=True, indent=4))
             else:
                 for doc in out:
                     print(txtOut(out[doc]))

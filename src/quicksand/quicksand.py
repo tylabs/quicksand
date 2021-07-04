@@ -41,7 +41,7 @@ import traceback
 import tempfile
 
 class quicksand:
-    __version__ = '2.0.9'
+    __version__ = '2.0.10'
     __author__ = "Tyler McLellan"
     __copyright__ = "Copyright 2021, @tylabs"
     __license__ = "MIT"
