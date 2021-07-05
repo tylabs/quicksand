@@ -2,7 +2,7 @@
 
 QuickSand.io Python Library and Command Line Tool
 
-QuickSand is a Python-based analysis framework to analyze suspected malware documents to identify exploits in streams of different encodings or compressions. QuickSand supports documents, PDFs, Mime/Email, Postscript and other common formats. 
+QuickSand is a Python-based analysis framework to analyze suspected malware documents to identify exploits in streams of different encodings or compressions. QuickSand supports documents, PDFs, Mime/Email, Postscript and other common formats. A built-in command line tool can process a single document or directory of documents.
 
 QuickSand supports scanning using Yara signatures within the decoded streams of documents and PDFs to identify exploits or high risk active content.
 
@@ -21,15 +21,14 @@ A hosted version is available to try without any installation at [quicksand.io](
 
 - bin/quicksand: Command line tool.
 
-- requirements.txt: pip dependencies 
+- requirements.txt: Python dependencies 
 
 - lambda/Dockerfile for building an Amazon Lambda environment
 
 - lambda/wait.py helper script for building Amazon Lambda environment
 
 
-
-### Python modules
+### With Thanks to the Creators of:
 
 - pdfreader
 
@@ -48,11 +47,13 @@ A hosted version is available to try without any installation at [quicksand.io](
 
 We recommend you installing yara-python from source as the pip builds on some operating systems might not be fully functional (hash module in particular.)
 
-## Install from Pypi
+
+## Installation from Pypi using pip
 
 ```
 pip3 install quicksand
 ```
+
 
 ## Upgrade
 
@@ -61,12 +62,14 @@ pip3 install --upgrade quicksand
 ```
 
 
-## Usage CLI
+## Command Line Usage
 
 A command line tool for quicksand to process and output json or txt results.
 
-
-```usage: quicksand [-h] [-v] [-c] [-y] [-t TIMEOUT] [-e EXPLOIT] [-x EXE] [-p PDF] [-f {json,txt}] [-o OUT] document
+```
+usage: quicksand [-h] [-v] [-c] [-y] [-t TIMEOUT] [-e EXPLOIT] [-x EXE] [-a PDF] [-f {json,txt}] [-o OUT] [-p PASSWORD]
+                 [-d DROPDIR]
+                 document
 
 QuickSand Document and PDF maldoc analysis tool.
 
@@ -83,25 +86,31 @@ optional arguments:
   -e EXPLOIT, --exploit EXPLOIT
                         yara exploit signatures
   -x EXE, --exe EXE     yara executable signatures
-  -p PDF, --pdf PDF     yara PDF signatures
+  -a PDF, --pdf PDF     yara PDF signatures
   -f {json,txt}, --format {json,txt}
                         output format
   -o OUT, --out OUT     save output to this filename
+  -p PASSWORD, --password PASSWORD
+                        password to decrypt ole or pdf
+  -d DROPDIR, --dropdir DROPDIR
+                        save objects to this directory
+
 ```
 
-### Single file
+### Process a single file
 
 ```
 quicksand document.doc
 ```
 
-### Directory of Files
+### Process a directory of files
 
 ```
 quicksand malware/
 ```
 
-## Usage Python Module
+
+## Python Module Usage
 
 ### File from memory
 
@@ -131,32 +140,10 @@ from quicksand.quicksand import quicksand
 qs = quicksand.readDir("malware")
 qs
 ```
-Returns a dictionary of filename: `qs_results`.
+Returns a dictionary of {filename: `qs_results`,...}.
 
 
-### Extract Streams As Files
-
-```
-from quicksand.quicksand import quicksand
-import os
-
-qs = quicksand("malware.doc", capture=True, debug=True)
-qs.process()
-print (qs.results)
-
-if not os.path.isdir("tmp"):
-    os.mkdir("tmp")
-for item in qs.results['streams']:
-    print (item)
-    f = open('tmp/' + str(item), 'wb')
-    f.write(qs.results['streams'][item])
-    f.close()
-```
-
-Writes extracted streams to ./tmp.
-
-
-### Extra Options for Constructor
+### Optional initializer values
 
 - capture: True|False return content of extracted streams
 
@@ -168,19 +155,26 @@ Writes extracted streams to ./tmp.
 
 - pdfyara: PDF Exploits yara rules
 
+- password: Password for encrypted documents/PDFs
+
+- timeout: Timeout processing: 0 for unlimited.
 
 
-### Jupyter Notes
+### zlib issues on MacOS
 
-Python might not be able to figure out the path to the yara signatures on it's own in Jupyter. You can either copy the yara files to the working directory with the .ipynb file, or provide the paths at run time:
+MacOS users may get zlib issues (PDF FlateDecode etc) due to missing OpenSSL headers since MacOs 10.4.
 
 ```
-from quicksand.quicksand import quicksand
-import os
+zlib.error: Error -3 while decompressing data: unknown compression method
+zlib.error: Error -3 while decompressing data: incorrect header check
+```
 
-qs = quicksand("malware/7ab0d0424eb9d655c0ee6d4a23473abf0c875892745336cb17fba7274dfe11a4", capture=True, debug=True, exploityara="/Users/user/Documents/GitHub/jupyter/quicksand/quicksand_exploits.yara", pdfyara="/Users/user/Documents/GitHub/jupyter/quicksand/quicksand_pdf.yara",execyara="/Users/user/Documents/GitHub/jupyter/quicksand_/quicksand_exe.yara" )
-qs.process()
-print (qs.results)
-````
+One solution is to install zlib with Brew.sh and reinstall Python 3 using pyenv:
+
+```
+export LDFLAGS="-L/usr/local/opt/zlib/lib"
+export CPPFLAGS="-I/usr/local/opt/zlib/include"
+pyenv install 3.8.5
+```
 
 

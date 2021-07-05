@@ -40,8 +40,10 @@ import string
 import traceback
 import tempfile
 
+
+
 class quicksand:
-    __version__ = '2.0.10'
+    __version__ = '2.0.11'
     __author__ = "Tyler McLellan"
     __copyright__ = "Copyright 2021, @tylabs"
     __license__ = "MIT"
@@ -70,13 +72,13 @@ class quicksand:
             self.msg("ERROR: file not found")
             return b''
     
-    def readDir(directory,capture=False,strings=True, debug=False, timeout=0, exploityara=None, execyara=None,pdfyara=None):
+    def readDir(directory,capture=False,strings=True, debug=False, timeout=0, exploityara=None, execyara=None,pdfyara=None, password=None):
         out = {}
         for f in listdir(directory):
             fname = join(directory, f)
             if isfile(fname):
                 #print (fname)
-                q = quicksand(fname,capture=False,strings=True, debug=False, timeout=0, exploityara=None, execyara=None,pdfyara=None)
+                q = quicksand(fname,capture=capture,strings=strings, debug=debug, timeout=timeout, exploityara=exploityara, execyara=execyara,pdfyara=pdfyara,password=password)
                 q.process()
                 out[fname] = q.results
         return out
@@ -85,13 +87,14 @@ class quicksand:
     def mapStructure(self, parent, loc):
         None
 
-    def __init__(self, data, capture=False,strings=True, debug=False, timeout=0, exploityara=None, execyara=None,pdfyara=None):
+    def __init__(self, data, capture=False,strings=True, debug=False, timeout=0, exploityara=None, execyara=None,pdfyara=None, password=None):
         self.results = {'results' : {}}
         self.structure = {}
 
         self.capture = capture
         self.strings = strings
         self.debug = debug
+        self.password = password
         self.results['score'] = 0
         self.results['warning'] = 0
         self.results['exploit'] = 0
@@ -340,7 +343,14 @@ class quicksand:
         try:
             quicksand.scan_pdf(self, doc, str(loc))
             #consider removing the obfuscated content here rather than in yara
-            pdf = PDFDocument(doc)
+            try:
+                if self.password != None:
+                    pdf = PDFDocument(doc, password=self.password)
+                else:
+                    pdf = PDFDocument(doc)
+            except:
+                pdf = PDFDocument(doc)
+
             #quicksand.msg(self, pdf.header.version)
             #quicksand.msg(self, pdf.pages())
             #quicksand.msg(self, pdf.catalog())
@@ -681,8 +691,9 @@ class quicksand:
                     try:
                         quicksand.msg (self,"ole file is encrypted")
                         temp.seek(0)
-                        
-                        
+                        passwords = crypto.DEFAULT_PASSWORDS
+                        if self.password != None:
+                            passwords += [self.password]
                         decrypted_file = crypto.decrypt(temp.name, crypto.DEFAULT_PASSWORDS)
                         if decrypted_file != None:
                             quicksand.msg (self,"ole file decrypted")

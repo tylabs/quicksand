@@ -5,8 +5,9 @@ import os.path
 import sys
 import argparse
 import json
+import re
 
-__version__ = '2.0.10'
+__version__ = '2.0.11'
 __author__ = "Tyler McLellan"
 __copyright__ = "Copyright 2021, @tylabs"
 __license__ = "MIT"
@@ -18,7 +19,7 @@ __license__ = "MIT"
 class BytesDump(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, bytes):
-            return obj.decode()
+            return obj.decode(errors='replace')
         return json.JSONEncoder.default(self, obj)
 
 # recursive key as string conversion for byte keys
@@ -79,17 +80,35 @@ def main(args=None):
                     type=int)
     parser.add_argument("-e", "--exploit", help="yara exploit signatures", default=None, type=str)
     parser.add_argument("-x", "--exe", help="yara executable signatures", default=None, type=str)
-    parser.add_argument("-p", "--pdf", help="yara PDF signatures", default=None, type=str)
+    parser.add_argument("-a", "--pdf", help="yara PDF signatures", default=None, type=str)
     parser.add_argument("-f", "--format", help="output format", type=str,
         choices=['json', 'txt'], default='json')
     parser.add_argument("-o", "--out", help="save output to this filename", default=None, type=str)
+    parser.add_argument("-p", "--password", help="password to decrypt ole or pdf", default=None, type=str)
+    parser.add_argument("-d", "--dropdir", help="save objects to this directory", default=None, type=str)
  
     args = parser.parse_args()
+    if args.dropdir != None:
+        args.capture=True
 
     if os.path.isfile(args.document):
         qs = quicksand(args.document, debug=args.verbose, capture=args.capture, strings=args.yara,
-            timeout=args.timeout, exploityara=args.exploit, execyara=args.exe, pdfyara=args.pdf)
+            timeout=args.timeout, exploityara=args.exploit, execyara=args.exe, pdfyara=args.pdf, password=args.password)
         qs.process()
+        if args.dropdir != None:
+            if not os.path.isdir(args.dropdir):
+                os.mkdir(args.dropdir)
+                print ("Creating directory " + str(args.dropdir))
+            if os.path.isdir(args.dropdir):
+                for item in qs.results['streams']:
+                    safe_name=re.sub('[^a-zA-Z0-9-_]', '_', item)
+                    f = open(args.dropdir + "/" + str(safe_name), 'wb')
+                    f.write(qs.results['streams'][item])
+                    f.close()
+            else:
+                print ("Unable to write to " + str(args.dropdir))
+
+
         if args.out:
             with open(args.out, 'w') as outfile:
                 if args.format == 'json':
@@ -104,7 +123,20 @@ def main(args=None):
  
     elif os.path.isdir(args.document):
         out = quicksand.readDir(args.document,debug=args.verbose, capture=args.capture, strings=args.yara,
-            timeout=args.timeout, exploityara=args.exploit, execyara=args.exe, pdfyara=args.pdf)
+            timeout=args.timeout, exploityara=args.exploit, execyara=args.exe, pdfyara=args.pdf, password=args.password)
+        if args.dropdir != None:
+            if not os.path.isdir(args.dropdir):
+                os.mkdir(args.dropdir)
+                print ("Creating directory " + str(args.dropdir))
+            if os.path.isdir(args.dropdir):
+                for doc in out:
+                    for item in out[doc]['streams']:
+                        safe_name=re.sub('[^a-zA-Z0-9-_]', '_', item)
+                        f = open(args.dropdir + "/" + out[doc]['md5'] + "_" + str(safe_name), 'wb')
+                        f.write(out[doc]['streams'][item])
+                        f.close()
+            else:
+                print ("Unable to write to " + str(args.dropdir))
 
 
         if args.out:
