@@ -1,10 +1,10 @@
 # QuickSand.io Version 2
 
-QuickSand.io Python Library and Command Line Tool
+QuickSand.io Python Package and Command Line Tool
 
 QuickSand is a Python-based analysis framework to analyze suspected malware documents to identify exploits in streams of different encodings or compressions. QuickSand supports documents, PDFs, Mime/Email, Postscript and other common formats. A built-in command line tool can process a single document or directory of documents.
 
-QuickSand supports scanning using Yara signatures within the decoded streams of documents and PDFs to identify exploits or high risk active content.
+QuickSand scans within the decoded streams of documents and PDFs using Yara signatures to identify exploits or high risk active content.
 
 A hosted version is available to try without any installation at [quicksand.io](https://quicksand.io/).
 
@@ -23,9 +23,7 @@ A hosted version is available to try without any installation at [quicksand.io](
 
 - requirements.txt: Python dependencies 
 
-- lambda/Dockerfile for building an Amazon Lambda environment
-
-- lambda/wait.py helper script for building Amazon Lambda environment
+- [lambda/](lambda/README.md) Optional AWS Lambda functions
 
 
 ### With Thanks to the Creators of:
@@ -42,10 +40,7 @@ A hosted version is available to try without any installation at [quicksand.io](
 
 - yara-python
 
-
-### Yara-python note:
-
-We recommend you installing yara-python from source as the pip builds on some operating systems might not be fully functional (hash module in particular.)
+- yara
 
 
 ## Installation from Pypi using pip
@@ -109,8 +104,8 @@ quicksand document.doc
 quicksand malware/
 ```
 
-
 ## Python Module Usage
+
 
 ### File from memory
 
@@ -123,7 +118,7 @@ qs.process()
 pprint.pprint(qs.results)
 ```
 
-### Filename
+### Processing using a filename
 
 ```
 from quicksand.quicksand import quicksand
@@ -140,6 +135,7 @@ from quicksand.quicksand import quicksand
 qs = quicksand.readDir("malware")
 qs
 ```
+
 Returns a dictionary of {filename: `qs_results`,...}.
 
 
@@ -160,6 +156,14 @@ Returns a dictionary of {filename: `qs_results`,...}.
 - timeout: Timeout processing: 0 for unlimited.
 
 
+## Scoring
+
+Documents are scored based on the rank value in the associated Yara signature metadata. 
+
+Additionally, each signature defines whether the detected item is an exploit, a warning or a risky feature. For more information on how to interpret the results, please see [https://quicksand.io/howto](https://quicksand.io/howto).
+
+If you add your own signatures, they don't need to include the extra metadata to function.
+
 ### zlib issues on MacOS
 
 MacOS users may get zlib issues (PDF FlateDecode etc) due to missing OpenSSL headers since MacOs 10.4.
@@ -177,4 +181,7 @@ export CPPFLAGS="-I/usr/local/opt/zlib/include"
 pyenv install 3.8.5
 ```
 
+## Using Quicksand?
+
+[Let us know](https://tylabs.com) @tylabs
 

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+</head>
+  <body>
+
+<form id="quicksand" action="https://qsupload.s3.amazonaws.com/" method="post" enctype="multipart/form-data" onsubmit="return doSend();" >
+<input id="file" name="file" type="file"><div id="qserror"></div>
+<BR>
+<input name="submit" value="Scan Document or PDF" type="submit" class="scan"  />
+</form>
+<BR>
+
+
+    <script src="{{ "/assets/js/gauge.min.js" | relative_url }}"></script>
+    <script src="{{ "/assets/js/quicksand.js" | relative_url }}"></script>
+  </body>
+</html>

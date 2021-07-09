@@ -1,6 +1,9 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 src/quicksand_pkg_tylabs.egg-info/
+lambda/dependencies.zip
+lambda/dependencies/
+lambda/lambda/
 dist/
 *.py[cod]
 *$py.class
