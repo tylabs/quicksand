@@ -25,7 +25,6 @@ RUN cp /usr/lib64/libkrb5.so.3 lambda; exit 0
 RUN cp /usr/lib64/libcom_err.so.2 lambda; exit 0
 RUN cp /usr/lib64/libk5crypto.so.3 lambda; exit 0
 RUN cp /usr/lib64/libcrypto.so.10 lambda; exit 0
-RUN cp /usr/lib64/libpcre.so lambda; exit 0
 RUN cp /usr/lib64/libdl.so.2 lambda; exit 0
 RUN cp /usr/lib64/libz.so.1 lambda; exit 0
 RUN cp /usr/lib64/libc.so.6 lambda; exit 0
