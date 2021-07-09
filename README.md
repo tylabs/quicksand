@@ -185,3 +185,7 @@ pyenv install 3.8.5
 
 [Let us know](https://tylabs.com) @tylabs
 
+
+## Issues and Project Home
+
+[QuickSand GitHub](https://github.com/tylabs/quicksand/)
