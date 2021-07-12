@@ -13,4 +13,4 @@ boto_s3 = boto3.client(
 
 qs_bucket = '##bucketname###'
 
-qs_url = 'https://quicksand.io/report?uuid='
+qs_url = 'https://scan.tylabs.com/report?uuid='

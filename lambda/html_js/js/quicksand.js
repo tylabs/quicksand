@@ -6,7 +6,7 @@ function getAttack(technique) {
 		console.log("get json");
 		var oReq = new XMLHttpRequest();
 
-		var url = "https://quicksand.io/assets/json/mitre.json";
+		var url = "https://scan.tylabs.com/assets/json/mitre.json";
 		oReq.open("GET", url, false);
 		oReq.overrideMimeType("application/json");
 		oReq.send();
@@ -113,7 +113,7 @@ function doReport(r) {
 
 	}
 
-	out += "<P><small><a target=\"_blank\" href=\"https://api.quicksand.io/put/search?query=" + r['md5'] + "\">json</a> | <a target=\"_blank\" href=\"howto\">how to interpret these results</a></small></P>";
+	out += "<P><small><a target=\"_blank\" href=\"https://api.tylabs.com/put/search?query=" + r['md5'] + "\">json</a> | <a target=\"_blank\" href=\"howto\">how to interpret these results</a></small></P>";
 
         return out;
 }
@@ -171,7 +171,7 @@ function process() {
 		document.getElementById("text").innerHTML = "<font color=red>Exceeded Time.... Task ID: " + uuid + "</font>";
     	}
 	};
-	var url = "https://api.quicksand.io/put/gravel?rerun=1&uuid=" + uuid;
+	var url = "https://api.tylabs.com/put/gravel?rerun=1&uuid=" + uuid;
 	if (typeof get('rerun') != "undefined" && get('rerun') == "1") {
 		url += "&rerun=1";
 	}
@@ -206,7 +206,7 @@ function search() {
 		};
 
 
-		oReq.open("GET", "https://api.quicksand.io/put/search?query=" + hash);
+		oReq.open("GET", "https://api.tylabs.com/put/search?query=" + hash);
 		oReq.send();
 	}
 }
@@ -245,7 +245,7 @@ function getSignature() {
 
 	var oReq = new XMLHttpRequest();
 
-	oReq.open("GET", "https://api.quicksand.io/put/upload?filename=" + encodeURIComponent(fullPath), false);
+	oReq.open("GET", "https://api.tylabs.com/put/upload?filename=" + encodeURIComponent(fullPath), false);
 	oReq.send();
 	if (oReq.status == 200) {
 		var myArr = JSON.parse(oReq.responseText);

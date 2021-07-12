@@ -1,4 +1,4 @@
-# QuickSand.io Lambda Function
+# QuickSand Lambda Function
 
 For the Lambda web-based file analysis version of QuickSand, the following components are included.
 
@@ -32,9 +32,11 @@ functions/config.py: S3 region and bucket name config for lambda_function.py, si
 
 html_js/default.html: File upload form, Javascript includes for template.
 
-html_js/quicksand.js: JS files to render reports. Some urls in quicksand.js will need to be set.
+html_js/js/quicksand.js: JS files to render reports. Some urls in quicksand.js will need to be set.
 
 html_js/report.md: Report page skeleton.
+
+html_js/json/mitre.json: MITRE Attack reference.
 
 
 ## File Upload and Processing Overview
@@ -53,5 +55,5 @@ A web page with a file upload form triggers the creation of a signed upload url 
 
 Then the user uploads the file to S3 directly using the signed url. The signed url has a redirect that includes a random uuid that will be used to trigger the file processing by the lambda_function.py function. Json is returned and rendered by Javascript on a report page (example [report.md](html_js/report.md).
 
-Optional search.py function to search for a cached report by md5. For a more complete experience, you may with to store and index the json results and create a full featured search and reporting capability. For demo purposes on [QuickSand.io](https://quicksand.io/) we don't index the reporting and expire/delete S3 files to save storage costs.
+Optional search.py function to search for a cached report by md5. For a more complete experience, you may with to store and index the json results and create a full featured search and reporting capability. For demo purposes on [scan.tylabs.com](https://scan.tylabs.com/) we don't index the reporting and expire/delete S3 files to save storage costs.
 

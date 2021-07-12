@@ -13,7 +13,7 @@ rule shellcode_hash__CloseHandle {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  CloseHandle"
 		mitre = "T1106"
 	strings:
@@ -36,7 +36,7 @@ rule shellcode_hash__CreateFileA {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  CreateFileA"
 		mitre = "T1106"
 	strings:
@@ -59,7 +59,7 @@ rule shellcode_hash__CreateProcessA {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  CreateProcessA"
 		mitre = "T1106"
 
@@ -83,7 +83,7 @@ rule shellcode_hash__DeleteFileA {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  DeleteFileA"
 		mitre = "T1106"
 
@@ -107,7 +107,7 @@ rule shellcode_hash__ExitProcess {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  ExitProcess"
 		mitre = "T1106"
 
@@ -131,7 +131,7 @@ rule shellcode_hash__ExitThread {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  ExitThread"
 		mitre = "T1106"
 
@@ -155,7 +155,7 @@ rule shellcode_hash__GetProcAddress {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  GetProcAddress"
 		mitre = "T1129"
 
@@ -179,7 +179,7 @@ rule shellcode_hash__GetSystemDirectoryA {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  GetSystemDirectoryA"
 		mitre = "T1106"
 
@@ -203,7 +203,7 @@ rule shellcode_hash___hwrite {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  _hwrite"
 		mitre = "T1106"
 
@@ -227,7 +227,7 @@ rule shellcode_hash___lclose {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  _lclose"
 		mitre = "T1106"
 
@@ -251,7 +251,7 @@ rule shellcode_hash___lcreat {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  _lcreat"
 		mitre = "T1106"
 
@@ -275,7 +275,7 @@ rule shellcode_hash__LoadLibraryA {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  LoadLibraryA"
 		mitre = "T1129"
 
@@ -299,7 +299,7 @@ rule shellcode_hash___lwrite {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  _lwrite"
 		mitre = "T1106"
 
@@ -323,7 +323,7 @@ rule shellcode_hash__SetUnhandledExceptionFilter {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  SetUnhandledExceptionFilter"
 		mitre = "T1106"
 
@@ -347,7 +347,7 @@ rule shellcode_hash__WaitForSingleObject {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  WaitForSingleObject"
 		mitre = "T1106"
 
@@ -371,7 +371,7 @@ rule shellcode_hash__WinExec {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  WinExec"
 		mitre = "T1059.003"
 
@@ -395,7 +395,7 @@ rule shellcode_hash__WriteFile {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  WriteFile"
 		mitre = "T1059"
 
@@ -419,7 +419,7 @@ rule shellcode_hash__accept {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  accept"
 		mitre = "T1106"
 
@@ -443,7 +443,7 @@ rule shellcode_hash__bind {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  bind"
 		mitre = "T1106"
 
@@ -467,7 +467,7 @@ rule shellcode_hash__closesocket {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  closesocket"
 		mitre = "T1106"
 
@@ -491,7 +491,7 @@ rule shellcode_hash__connect {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  connect"
 		mitre = "T1106"
 
@@ -515,7 +515,7 @@ rule shellcode_hash__listen {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  listen"
 		mitre = "T1106"
 
@@ -539,7 +539,7 @@ rule shellcode_hash__recv {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  recv"
 		mitre = "T1106"
 
@@ -563,7 +563,7 @@ rule shellcode_hash__send {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  send"
 		mitre = "T1106"
 
@@ -587,7 +587,7 @@ rule shellcode_hash__socket {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  socket"
 		mitre = "T1106"
 
@@ -611,7 +611,7 @@ rule shellcode_hash__WSASocketA {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  WSASocketA"
 		mitre = "T1106"
 
@@ -635,7 +635,7 @@ rule shellcode_hash__WSAStartup {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  WSAStartup"
 		mitre = "T1106"
 
@@ -659,7 +659,7 @@ rule shellcode_hash__URLDownloadToFileA {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  URLDownloadToFileA"
 		mitre = "T1106"
 
@@ -683,7 +683,7 @@ rule suspicious_shellcode_NOP_Sled {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_shellcode"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.shellcode NOP Sled"
 		mitre = "T1106"
 
@@ -707,7 +707,7 @@ rule suspicious_obfuscation_using_unescape {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation using unescape"
 		mitre = "T1027"
 	strings:
@@ -736,7 +736,7 @@ rule suspicious_obfuscation_using_charCodeAt {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation using charCodeAt"
 		mitre = "T1027"
 
@@ -758,7 +758,7 @@ rule suspicious_string_nopblock {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.string nopblock"
 		mitre = "T1027"
 
@@ -780,7 +780,7 @@ rule suspicious_obfuscation_using_eval {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation using eval"
 		mitre = "T1027"
 
@@ -808,7 +808,7 @@ rule suspicious_javascript_object {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.javascript object"
 		mitre = "T1027 T1059.007"
 
@@ -831,7 +831,7 @@ rule suspicious_javascript_in_XFA_block {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.javascript in XFA block"
 		mitre = "T1027 T1059.007"
 
@@ -855,7 +855,7 @@ rule suspicious_pdf_embedded_PDF_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.pdf embedded PDF file"
 		mitre = "T1204.002"
 	strings:
@@ -876,7 +876,7 @@ rule suspicious_obfuscation_toString {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation toString"
 		mitre = "T1027"
 
@@ -898,7 +898,7 @@ rule suspicious_obfuscation_using_substr {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation using substr"
 		mitre = "T1027"
 
@@ -920,7 +920,7 @@ rule suspicious_obfuscation_using_String_replace {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation using String.replace"
 		mitre = "T1027"
 
@@ -943,7 +943,7 @@ rule suspicious_obfuscation_using_String_fromCharCode {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation using String.fromCharCode"
 		mitre = "T1027"
 
@@ -968,7 +968,7 @@ rule suspicious_obfuscation_using_substring {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation using substring"
 		mitre = "T1027"
 
@@ -990,7 +990,7 @@ rule suspicious_obfuscation_using_util_byteToChar {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation using util.byteToChar"
 		mitre = "T1027"
 	strings:
@@ -1011,7 +1011,7 @@ rule suspicious_string_Shellcode_NOP_sled {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.string Shellcode NOP sled"
 		mitre = "T1027"
 
@@ -1033,7 +1033,7 @@ rule suspicious_string_heap_spray_shellcode {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.string heap spray shellcode"
 		mitre = "T1027"
 
@@ -1055,7 +1055,7 @@ rule suspicious_string_shellcode {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.string shellcode"
 		mitre = "T1027"
 
@@ -1077,7 +1077,7 @@ rule suspicious_string__Run_Sploit_ {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.string -Run_Sploit-"
 		mitre = "T1027"
 
@@ -1099,7 +1099,7 @@ rule suspicious_string__HeapSpray_ {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.string -HeapSpray-"
 		mitre = "T1027"
 
@@ -1121,7 +1121,7 @@ rule suspicious_flash_writeMultiByte {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.flash writeMultiByte"
 		mitre = "T1027"
 
@@ -1143,7 +1143,7 @@ rule suspicious_flash_addFrameScript {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.flash addFrameScript"
 		mitre = "T1027"
 
@@ -1165,7 +1165,7 @@ rule suspicious_flash_Adobe_Shockwave_Flash_in_a_PDF_define_obj_type {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.flash Adobe Shockwave Flash in a PDF define obj type"
 	strings:
 		$h_hex1 = { (52|233532) (69|233639) (63|233633) (68|233638) (4D|233444|233464) (65|233635) (64|233634) (69|233639)(61|233631) }
@@ -1185,7 +1185,7 @@ rule suspicious_flash_obfuscated_name {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.flash obfuscated name"
 		mitre = "T1027"
 	strings:
@@ -1206,7 +1206,7 @@ rule pdf_exploit_FlateDecode_Stream_Predictor_02_Integer_Overflow_CVE_2009_3459 
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit FlateDecode Stream Predictor 02 Integer Overflow CVE-2009-3459"
 		mitre = "T1203 T1204.002"
 
@@ -1228,7 +1228,7 @@ rule pdf_exploit_colors_number_is_high_CVE_2009_3459 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit colors number is high CVE-2009-3459"
 		mitre = "T1203 T1204.002"
 
@@ -1250,7 +1250,7 @@ rule pdf_exploit_URI_directory_traversal {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit URI directory traversal"
 		mitre = "T1203 T1204.002"
 
@@ -1272,7 +1272,7 @@ rule pdf_exploit_URI_directory_traversal_system32 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit URI directory traversal system32"
 		mitre = "T1203 T1204.002"
 
@@ -1294,7 +1294,7 @@ rule pdf_exploit_execute_EXE_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit execute EXE file"
 		mitre = "T1203 T1204.002"
 
@@ -1316,7 +1316,7 @@ rule pdf_warning_openaction {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.warning OpenAction"
 		mitre = "T1203 T1204.002"
 
@@ -1338,7 +1338,7 @@ rule pdf_exploit_access_system32_directory {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit access system32 directory"
 		mitre = "T1203 T1204.002"
 
@@ -1361,7 +1361,7 @@ rule pdf_warning_remote_action {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_active"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit action uri"
 		mitre = "T1566.002"
 	strings:
@@ -1387,7 +1387,7 @@ rule pdf_exploit_execute_action_command {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit execute action command"
 		mitre = "T1203 T1204.002"
 
@@ -1409,7 +1409,7 @@ rule pdf_exploit_printSeps_memory_heap_corruption_CVE_2010_4091 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit printSeps memory heap corruption CVE-2010-4091"
 		mitre = "T1203 T1204.002"
 
@@ -1431,7 +1431,7 @@ rule suspicious_obfuscation_jjencoded_javascript {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation jjencoded javascript"
 		mitre = "T1059.007"
 	strings:
@@ -1453,7 +1453,7 @@ rule suspicious_obfuscation_getAnnots_access_blocks {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation getAnnots access blocks"
 		mitre = "T1059.007"
 
@@ -1478,7 +1478,7 @@ rule suspicious_obfuscation_info_Trailer_to_access_blocks {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation info.Trailer to access blocks"
 		mitre = "T1059.007"
 
@@ -1500,7 +1500,7 @@ rule suspicious_obfuscation_using_app_setTimeOut_to_eval_code {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.obfuscation using app.setTimeOut to eval code"
 		mitre = "T1059.007"
 
@@ -1522,7 +1522,7 @@ rule suspicious_string__shellcode_ {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.string -shellcode-"
 		mitre = "T1027 T1059.007"
 	strings:
@@ -1543,7 +1543,7 @@ rule pdf_exploit_Collab_collectEmailInfo_CVE_2008_0655 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit Collab.collectEmailInfo CVE-2008-0655"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1566,7 +1566,7 @@ rule pdf_exploit_Collab_getIcon_CVE_2009_0927 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit Collab.getIcon CVE-2009-0927"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1589,7 +1589,7 @@ rule pdf_suspicious_util_printd_used_to_fill_buffers {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.suspicious util.printd used to fill buffers"
 		mitre = "T1027 T1059.007"
 	strings:
@@ -1610,7 +1610,7 @@ rule pdf_exploit_media_newPlayer_CVE_2009_4324 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit media.newPlayer CVE-2009-4324"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1636,7 +1636,7 @@ rule pdf_exploit_spell_customDictionaryOpen_CVE_2009_1493 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit spell.customDictionaryOpen CVE-2009-1493"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1658,7 +1658,7 @@ rule pdf_exploit_util_printf_CVE_2008_2992 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit util.printf CVE-2008-2992"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1679,7 +1679,7 @@ rule pdf_exploit_using_TIFF_overflow_CVE_2010_0188 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit using TIFF overflow CVE-2010-0188"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1701,7 +1701,7 @@ rule suspicious_string_TIFF_overflow_exploit_tif_name_CVE_2010_0188 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.string TIFF overflow exploit.tif name CVE-2010-0188"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1722,7 +1722,7 @@ rule suspicious_string_base_64_nop_sled_used_in_TIFF_overflow_CVE_2010_0188 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.string base 64 nop sled used in TIFF overflow CVE-2010-0188"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1747,7 +1747,7 @@ rule pdf_exploit_TIFF_overflow_CVE_2010_0188 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit TIFF overflow CVE-2010-0188"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1770,7 +1770,7 @@ rule pdf_execute_access_system32_directory {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.execute access system32 directory"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1791,7 +1791,7 @@ rule suspicious_string_obfuscated_unicode_NOP_sled {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.string obfuscated unicode NOP sled"
 		mitre = "T1027"
 	strings:
@@ -1812,7 +1812,7 @@ rule suspicious_flash_Embedded_Flash {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.flash Embedded Flash"
 	strings:
 		$h_reg1 = /^FWS/
@@ -1839,7 +1839,7 @@ rule suspicious_flash_Embedded_Flash_define_obj {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.flash Embedded Flash define obj"
 		mitre = "T1204.002"
 	strings:
@@ -1861,7 +1861,7 @@ rule pdf_exploit_fontfile_SING_table_overflow_CVE_2010_2883_generic {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit fontfile SING table overflow CVE-2010-2883 generic"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1883,7 +1883,7 @@ rule pdf_exploit_fontfile_SING_table_overflow_CVE_2010_2883_A {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit fontfile SING table overflow CVE-2010-2883 A"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1904,7 +1904,7 @@ rule flash_exploit_CVE_2011_0609 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "flash.exploit CVE-2011-0609"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1927,7 +1927,7 @@ rule flash_exploit_CVE_2011_0611 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "flash.exploit CVE-2011-0611"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1954,7 +1954,7 @@ rule flash_suspicious_jit_spray {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "flash.suspicious jit_spray"
 		mitre = "T1027 T1059.007"
 	strings:
@@ -1975,7 +1975,7 @@ rule pdf_exploit_U3D_CVE_2011_2462_A {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit U3D CVE-2011-2462 A"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -1996,7 +1996,7 @@ rule pdf_exploit_PRC_CVE_2011_4369_A {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit PRC CVE-2011-4369 A"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -2017,7 +2017,7 @@ rule flash_exploit_flash_calling_malformed_MP4_CVE_2012_0754 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "flash.exploit flash calling malformed MP4 CVE-2012-0754"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -2038,7 +2038,7 @@ rule flash_exploit_MP4_Loader_CVE_2012_0754_B {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "flash.exploit MP4 Loader CVE-2012-0754 B"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -2059,7 +2059,7 @@ rule flash_exploit_MP4_CVE_2012_0754 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "flash.exploit MP4 CVE-2012-0754"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -2080,7 +2080,7 @@ rule pdf_exploit_Sandbox_Bypass_CVE_2013_0641 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit Sandbox Bypass CVE-2013-0641"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -2101,7 +2101,7 @@ rule pdf_exploit_BMP_RLE_integer_heap_overflow_CVE_2013_2729 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit BMP RLE integer heap overflow CVE-2013-2729"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -2123,7 +2123,7 @@ rule pdf_exploit_ToolButton_use_after_free_CVE_2014_0496 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit ToolButton use-after-free CVE-2014-0496"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -2145,7 +2145,7 @@ rule suspicious_javascript_addToolButton {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.javascript addToolButton"
 		mitre = "T1059.007"
 	strings:
@@ -2166,7 +2166,7 @@ rule suspicious_embedded_doc_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded doc file"
 		mitre = "T1204.002"
 	strings:
@@ -2187,7 +2187,7 @@ rule suspicious_embedded_xls_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded xls file"
 		mitre = "T1204.002"
 
@@ -2209,7 +2209,7 @@ rule suspicious_embedded_ppt_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded ppt file"
 		mitre = "T1204.002"
 
@@ -2232,7 +2232,7 @@ rule suspicious_embedded_scr_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded scr file"
 		mitre = "T1204.002"
 
@@ -2254,7 +2254,7 @@ rule suspicious_embedded_exe_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded exe file"
 		mitre = "T1204.002"
 
@@ -2276,7 +2276,7 @@ rule suspicious_embedded_bat_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded bat file"
 		mitre = "T1204.002"
 
@@ -2298,7 +2298,7 @@ rule suspicious_embedded_rtf_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded rtf file"
 		mitre = "T1204.002"
 
@@ -2320,7 +2320,7 @@ rule suspicious_embedded_mso_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded mso file"
 		mitre = "T1204.002"
 
@@ -2342,7 +2342,7 @@ rule suspicious_embedded_html_file {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded html file"
 		mitre = "T1204.002"
 
@@ -2364,7 +2364,7 @@ rule suspicious_embedded_OLE_document_header {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded OLE document header"
 		mitre = "T1204.002"
 
@@ -2386,7 +2386,7 @@ rule suspicious_embedded_external_content {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.embedded external content"
 		mitre = "T1566.002"
 	strings:
@@ -2407,7 +2407,7 @@ rule pdf_exploit_Corrupted_JPEG2000_CVE_2018_4990 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit Corrupted JPEG2000 CVE-2018-4990"
 		mitre = "T1203 T1204.002"
 	strings:
@@ -2428,7 +2428,7 @@ rule pdf_exploit_using_jbig2decode_CVE_2009_0658 {
 		release = "full"
 		tlp = "amber"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 QuickSand.io. All rights reserved."
+		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "pdf.exploit using JBIG2Decode CVE-2009-0658"
 		mitre = "T1203 T1204.002"
 		url = "https://www.exploit-db.com/exploits/8099"
