@@ -1,12 +1,12 @@
-# QuickSand.io Version 2
+# QuickSand Version 2
 
-QuickSand.io Python Package and Command Line Tool
+QuickSand Python Package and Command Line Tool
 
 QuickSand is a Python-based analysis framework to analyze suspected malware documents to identify exploits in streams of different encodings or compressions. QuickSand supports documents, PDFs, Mime/Email, Postscript and other common formats. A built-in command line tool can process a single document or directory of documents.
 
 QuickSand scans within the decoded streams of documents and PDFs using Yara signatures to identify exploits or high risk active content.
 
-A hosted version is available to try without any installation at [quicksand.io](https://quicksand.io/).
+A hosted version is available to try without any installation at [scan.tylabs.com](https://scan.tylabs.com/).
 
 
 ## Files:
@@ -160,7 +160,7 @@ Returns a dictionary of {filename: `qs_results`,...}.
 
 Documents are scored based on the rank value in the associated Yara signature metadata. 
 
-Additionally, each signature defines whether the detected item is an exploit, a warning or a risky feature. For more information on how to interpret the results, please see [https://quicksand.io/howto](https://quicksand.io/howto).
+Additionally, each signature defines whether the detected item is an exploit, a warning or a risky feature. For more information on how to interpret the results, please see [https://scan.tylabs.com/howto](https://quicksand.io/howto).
 
 If you add your own signatures, they don't need to include the extra metadata to function.
 
