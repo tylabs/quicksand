@@ -50,10 +50,18 @@ pip3 install quicksand
 ```
 
 
-## Upgrade
+## Upgrade from Pypi using pip
 
 ```
 pip3 install --upgrade quicksand
+```
+
+## Install from source
+
+If you want to install from the source, such as the uicksand-main.zip downloaded from GitHub:
+
+```
+pip3 install quicksand-main.zip
 ```
 
 
