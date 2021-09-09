@@ -10,8 +10,7 @@ rule executable_win_pe {
 		date = "Dec 27 2015"
 		author = "@tylabs"
 		desc = "MZ Header"
-		copyright = "QuickSand.io 2015"
-		tlp = "green"
+		copyright = "tylabs.com 2015"
 		mitre = "T1027"
 
 	strings:
@@ -30,9 +29,7 @@ rule executable_win_pe_transposed {
 		author = "@tylabs"
 		desc = "MZ Transposed"
 		mitre = "T1027"
-
-		copyright = "QuickSand.io 2015"
-		tlp = "green"
+		copyright = "tylabs.com 2015"
 
 	strings:
 		$s1 = /ZM.{76}hTsip orrgma/
@@ -50,9 +47,7 @@ rule executable_win_pe_transposed_offbyone {
 		date = "Dec 27 2015"
 		author = "@tylabs"
 		desc = "MZ transposed and shifted"
-
-		copyright = "QuickSand.io 2015"
-		tlp = "green"
+		copyright = "tylabs.com 2015"
 		mitre = "T1027"
 
 	strings:
@@ -71,10 +66,9 @@ rule executable_win {
 		rank = 10
 		date = "July 29 2015"
 		author = "@tylabs"
-		copyright = "QuickSand.io 2015"
+		copyright = "tylabs.com 2015"
 		desc = "EXE strings"
 		mitre = "T1027"
-		tlp = "green"
 
 	strings:
 		$s1 = "This program cannot be run in DOS mode"
@@ -120,8 +114,7 @@ rule executable_win_transposed {
 		date = "July 29 2015"
 		desc = "Transposition cipher"
 		author = "@tylabs"
-		copyright = "QuickSand.io 2015"
-		tlp = "green"
+		copyright = "tylabs.com 2015"
 		mitre = "T1027"
 
 	strings:
@@ -139,9 +132,8 @@ rule executable_win_rtl {
 		date = "July 29 2015"
 		desc = "Right to Left compression LZNT1"
 		author = "@tylabs"
-		copyright = "QuickSand.io 2015"
+		copyright = "tylabs.com 2015"
 		mitre = "T1027"
-		tlp = "green"
 	strings:
 		$s1 = {2070726F6772616D002063616E6E6F74200062652072756E2069006E20444F53206D6F} // string.RTL.This program cannot be run in DOS mode
 	condition:
@@ -157,9 +149,8 @@ rule executable_win_reversed {
 		date = "July 29 2015"
 		desc = "EXE is stored backwards"
 		author = "@tylabs"
-		copyright = "QuickSand.io 2015"
+		copyright = "tylabs.com 2015"
 		mitre = "T1027"
-		tlp = "green"
 	strings:
 		$s1 = "edom SOD ni nur eb tonnac margorp sihT" // string.reverse This program cannot be run in DOS mode	condition:
 	condition:
@@ -176,11 +167,10 @@ rule executable_vb {
 		type = "vb"
 		date = "July 29 2015"
 		author = "@tylabs"
-		copyright = "QuickSand.io 2015"
+		copyright = "tylabs.com 2015"
 		desc = "VB script"
 		mitre = "T1059.005"
 
-		tlp = "green"
 	strings:
 		$s1 = "impersonationLevel=impersonate"
 		$s2 = "On Error Resume Next"
@@ -199,12 +189,11 @@ rule executable_macosx {
 		rank = 10
 		date = "July 29 2015"
 		author = "@tylabs"
-		copyright = "QuickSand.io 2015"
+		copyright = "tylabs.com 2015"
 		desc = "Mac executable"
 		mitre = "T1027"
 
 
-		tlp = "green"
 	strings:
 		$s1 = "<key>RunAtLoad</key>"
 		$s2 = "__mh_execute_header"

@@ -5,14 +5,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="quicksand",
-    version="2.0.12",
+    version="2.0.13",
     author="Tyler McLellan",
     author_email="nospam@tylabs.com",
     description="QuickSand is a module to scan streams inside documents with Yara",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/tylabs/quicksand",
-    download_url="https://github.com/tylabs/quicksand/archive/refs/tags/2.0.12.tar.gz",
+    download_url="https://github.com/tylabs/quicksand/archive/refs/tags/2.0.13.tar.gz",
     include_package_data=True,
     keywords = ['document', 'malware', 'forensics', 'yara', 'parser'],
     project_urls={
