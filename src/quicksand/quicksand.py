@@ -44,7 +44,7 @@ import tempfile
 
 class quicksand:
     __version__ = '2.0.13'
-    __author__ = "Tyler McLellan"
+    __author__ = "tylabs.com"
     __copyright__ = "Copyright 2021, @tylabs"
     __license__ = "MIT"
     
