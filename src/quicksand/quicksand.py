@@ -486,10 +486,14 @@ class quicksand:
             #quicksand.msg(self, pdf.parser)
             for block in re.findall(rb'((\x0a|\x0d|\x20)(\d{1,4})[^\d]{1,3}(\d{1,2})\sobj|(\x0a|\x0d)(xref|trailer)(\x0a|\x0d))',doc):
                 if len(block[2]) != 0:
-                    num = int(block[2])
-                    gen = int(block[3])
-                    self.msg(f"obj {num} {gen}")
-                    self.structure += f"{num}-{gen},"
+                    try:
+                        num = int(block[2])
+                        gen = int(block[3])
+                        self.msg(f"obj {num} {gen}")
+                        self.structure += f"{num}-{gen},"
+                    except ValueError:
+                        self.msg(f"Error parsing numeric token in PDF object: {block[2]}")
+                        continue
                 else:
                     self.structure += block[5].decode("utf-8") + ","
                     self.msg(f"obj {block[5].decode('utf-8')}")
@@ -504,30 +508,36 @@ class quicksand:
                 #for block in re.findall(b'((\x0a|\x0d|\x20)(\d{1,4})[^\d]{1,3}(\d{1,2})\sobj|(\x0a|\x0d)(xref|trailer)(\x0a|\x0d))',doc):
                 #quicksand.msg (self,str(time.time()) + " " + str(block))
                 if block[2]:
-                    num = int(block[2])
-                    gen = int(block[3])
-                    self.msg(f"stream {num} {gen}")
-                    
                     try:
-                        raw_obj = pdf.locate_object(num, gen)
-
-                        obj = pdf.build(raw_obj)
-                    except Exception as e:
-                        self.msg(e)
+                        num = int(block[2])
+                        gen = int(block[3])
+                        self.msg(f"stream {num} {gen}")
                         
-                    try:
-                        if type(obj) == pdfreader.types.objects.StreamBasedObject:
-                            #quicksand.msg(self, "scan stream " + str (obj.get('Filter')) + " " + str(len(obj.filtered)))
-                            #quicksand.scan_pdf(self, obj.data,str(loc) + "-pdf_" + str(num) + "_" + str(gen))
-                            pdf_object_loc = f"{loc}-pdf_{num}_{gen}"
-                            quicksand.scan_pdf(self, obj.filtered, pdf_object_loc)
-                            if self.capture:
-                                self.results['streams'][pdf_object_loc] = obj.filtered
-                        #else:
-                            #quicksand.msg(self, obj)
-                    except Exception as e:
-                        self.msg(e)
-            
+                        try:
+                            raw_obj = pdf.locate_object(num, gen)
+                            obj = pdf.build(raw_obj)
+                        except (ValueError, pdfreader.exceptions.PDFSyntaxError) as e:
+                            self.msg(f"Error parsing PDF object {num} {gen}: {e}")
+                            continue
+                        except Exception as e:
+                            self.msg(e)
+                            continue
+                            
+                        try:
+                            if type(obj) == pdfreader.types.objects.StreamBasedObject:
+                                #quicksand.msg(self, "scan stream " + str (obj.get('Filter')) + " " + str(len(obj.filtered)))
+                                #quicksand.scan_pdf(self, obj.data,str(loc) + "-pdf_" + str(num) + "_" + str(gen))
+                                pdf_object_loc = f"{loc}-pdf_{num}_{gen}"
+                                quicksand.scan_pdf(self, obj.filtered, pdf_object_loc)
+                                if self.capture:
+                                    self.results['streams'][pdf_object_loc] = obj.filtered
+                            #else:
+                                #quicksand.msg(self, obj)
+                        except Exception as e:
+                            self.msg(e)
+                    except ValueError as e:
+                        self.msg(f"Error parsing numeric token in PDF stream: {block[2]}, {block[3]}")
+                        continue
                 else:
                     #quicksand.msg (self,"special " + str(block[5].decode()) )
                     None

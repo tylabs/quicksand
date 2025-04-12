@@ -2226,4 +2226,27 @@ rule pdf_exploit_using_jbig2decode_CVE_2009_0658 {
 	condition: all of them
 }
 
+rule pdf_exploit_CVE_2023_21608 {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 5
+		revision = "1"
+		date = "April 12 2025"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_obfuscation"
+		copyright = "Copyright 2025 tylabs.com. All rights reserved."
+		desc = "pdf.exploit Use-After-Free Vulnerability CVE-2023-21608"
+		mitre = "T1203 T1204.002"
+		url = "https://github.com/hacksysteam/CVE-2023-21608"
+	strings:
+		$s1 = "setAction(\"Calculate\"" nocase
+		$s2 = "defineProperty(this" nocase
+		$s3 = "this.resetForm()" nocase
+		$s4 = "event.__defineGetter__(" nocase
+		$s5 = "event.richValue" nocase
+		$s6 = "Object.defineProperty(" nocase
 
+	condition: 3 of them
+}
