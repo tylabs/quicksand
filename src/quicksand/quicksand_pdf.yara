@@ -1236,15 +1236,15 @@ rule pdf_exploit_access_system32_directory {
 rule pdf_warning_remote_action {
 	meta:
 		is_exploit = false
-		is_warning = true
-		is_feature = false
-		rank = 5
-		revision = "1"
-		date = "June 07 2020"
+		is_warning = false
+		is_feature = true
+		rank = 0
+		revision = "2"
+		date = "April 12 2025"
 		author = "@tylabs"
 		sigtype = "pdfexaminer_active"
-		copyright = "Copyright 2020 tylabs.com. All rights reserved."
-		desc = "pdf.exploit action uri"
+		copyright = "Copyright 2025 tylabs.com. All rights reserved."
+		desc = "pdf.information action uri link"
 		mitre = "T1566.002"
 	strings:
 		$h_reg1 = /\/(A|#41)(c|#63)(t|#74)(i|#69)(o|#6F)(n|6e)\s*\/(U|#55)(R|#52)(I|49)/
