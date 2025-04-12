@@ -1,4 +1,3 @@
-
 var attackjson = null;
 
 function getAttack(technique) {
@@ -103,9 +102,35 @@ function doReport(r) {
 
 			if (typeof r['results'][name][i]["strings"] != "undefined") {
 				out += "<ul>";
-				for (var string in r['results'][name][i]["strings"]) {
-					out += "<li>@" + r['results'][name][i]["strings"][string][0] + ": <small>" + r['results'][name][i]["strings"][string][2] + "</small></li>";
-
+				// Check if strings is an array (old format) or a string (new format)
+				if (Array.isArray(r['results'][name][i]["strings"])) {
+					// Old format handling - strings is an array of arrays
+					for (var string in r['results'][name][i]["strings"]) {
+						out += "<li>@" + r['results'][name][i]["strings"][string][0] + ": <small>" + r['results'][name][i]["strings"][string][2] + "</small></li>";
+					}
+				} else {
+					// New format handling - strings is a string with newline-separated entries
+					var stringsArray = r['results'][name][i]["strings"].split("\n");
+					for (var j = 0; j < stringsArray.length; j++) {
+						var line = stringsArray[j].trim();
+						if (line) {
+							// Parse the line which should be in format "identifier at offset X: data"
+							var parts = line.split("at offset");
+							if (parts.length >= 2) {
+								var identifier = parts[0].trim();
+								var restParts = parts[1].split(":");
+								if (restParts.length >= 2) {
+									var offset = restParts[0].trim();
+									var data = restParts.slice(1).join(":").trim();
+									out += "<li>@" + identifier + ": <small>" + data + "</small></li>";
+								} else {
+									out += "<li>" + line + "</li>";
+								}
+							} else {
+								out += "<li>" + line + "</li>";
+							}
+						}
+					}
 				}
 				out += "</ul>";
 			}

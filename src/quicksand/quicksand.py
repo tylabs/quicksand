@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 ###
-### QuickSand 2: Python3 Version Copyright (c) 2021 @tylabs
+### QuickSand 2: Python3 Version Copyright (c) 2025 @tylabs
 ### https://github.com/tylabs/quicksand
 ###
 ### Python3 module and executable to process suspected document or PDF malware for exploit detection
@@ -17,7 +17,6 @@
 ###
 
 import sys
-import os.path
 import re
 import olefile
 import binascii
@@ -39,58 +38,110 @@ import time
 import string
 import traceback
 import tempfile
-
+from pathlib import Path
+from typing import Dict, List, Optional, Union, Tuple, Any, BinaryIO
 
 
 class quicksand:
-    __version__ = '2.0.13'
+    __version__ = '2.1.0'
     __author__ = "tylabs.com"
-    __copyright__ = "Copyright 2021, @tylabs"
+    __copyright__ = "Copyright 2025, @tylabs"
     __license__ = "MIT"
     
     try:
-        exploityara = str(os.path.dirname(__file__)) + '/quicksand_exploits.yara'
-        execyara = str(os.path.dirname(__file__)) + '/quicksand_exe.yara'
-        pdfyara = str(os.path.dirname(__file__)) + '/quicksand_pdf.yara'
-
+        # Use pathlib for file paths
+        base_dir = Path(__file__).parent
+        exploityara = str(base_dir / 'quicksand_exploits.yara')
+        execyara = str(base_dir / 'quicksand_exe.yara')
+        pdfyara = str(base_dir / 'quicksand_pdf.yara')
     except:
         exploityara = 'quicksand_exploits.yara'
         execyara = 'quicksand_exe.yara'
         pdfyara = 'quicksand_pdf.yara'
     
-    def msg(self, m):
+    def msg(self, message: Any) -> None:
+        """Log a debug message if debug mode is enabled.
+        
+        Args:
+            message: The message to log
+        """
         if self.debug:
-            print(str(time.time()) + ": " + str(m))
+            print(f"{time.time()}: {message}")
 
     def readFile(self, filename):
+        """Read a file and return its contents as bytes.
+        
+        Args:
+            filename: The path to the file to read.
+            
+        Returns:
+            bytes: The contents of the file, or empty bytes if the file is not found.
+        """
         try:
-            f = open(filename, "rb")
-            doc = f.read()
-            f.close()
-            return doc
+            with open(filename, "rb") as f:
+                return f.read()
         except:
             self.msg("ERROR: file not found")
             return b''
     
-    def readDir(directory,capture=False,strings=True, debug=False, timeout=0, exploityara=None, execyara=None,pdfyara=None, password=None):
+    @staticmethod
+    def readDir(directory: str, capture: bool = False, strings: bool = True, 
+               debug: bool = False, timeout: int = 0, exploityara: Optional[str] = None, 
+               execyara: Optional[str] = None, pdfyara: Optional[str] = None, 
+               password: Optional[str] = None) -> Dict[str, Dict]:
+        """Process all files in a directory.
+        
+        Args:
+            directory: Path to the directory containing files to analyze
+            capture: Whether to capture stream content
+            strings: Whether to capture YARA match strings
+            debug: Whether to enable debug logging
+            timeout: Timeout in seconds (0 for no timeout)
+            exploityara: Path to exploit YARA rules
+            execyara: Path to executable YARA rules
+            pdfyara: Path to PDF YARA rules
+            password: Password for encrypted documents
+            
+        Returns:
+            Dict mapping filenames to analysis results
+        """
         out = {}
-        for f in listdir(directory):
-            fname = join(directory, f)
-            if isfile(fname):
-                #print (fname)
-                q = quicksand(fname,capture=capture,strings=strings, debug=debug, timeout=timeout, exploityara=exploityara, execyara=execyara,pdfyara=pdfyara,password=password)
-                q.process()
-                out[fname] = q.results
+        try:
+            dir_path = Path(directory)
+            for file_path in dir_path.iterdir():
+                if file_path.is_file():
+                    q = quicksand(str(file_path), capture=capture, strings=strings, 
+                                 debug=debug, timeout=timeout, exploityara=exploityara, 
+                                 execyara=execyara, pdfyara=pdfyara, password=password)
+                    q.process()
+                    out[str(file_path)] = q.results
+        except Exception as e:
+            print(f"Error processing directory {directory}: {e}")
         return out
 
 
     def mapStructure(self, parent, loc):
         None
 
-    def __init__(self, data, capture=False,strings=True, debug=False, timeout=0, exploityara=None, execyara=None,pdfyara=None, password=None):
-        self.results = {'results' : {}}
-        self.structure = {}
-
+    def __init__(self, data: Union[str, bytes], capture: bool = False, strings: bool = True, 
+              debug: bool = False, timeout: int = 0, exploityara: Optional[str] = None, 
+              execyara: Optional[str] = None, pdfyara: Optional[str] = None, 
+              password: Optional[str] = None):
+        """Initialize a quicksand analyzer.
+        
+        Args:
+            data: Either a file path or raw bytes data to analyze
+            capture: Whether to capture stream content
+            strings: Whether to capture YARA match strings
+            debug: Whether to enable debug logging
+            timeout: Timeout in seconds (0 for no timeout)
+            exploityara: Path to exploit YARA rules (overrides default)
+            execyara: Path to executable YARA rules (overrides default)
+            pdfyara: Path to PDF YARA rules (overrides default)
+            password: Password for encrypted documents
+        """
+        self.results = {'results': {}}
+        self.structure = ""
         self.capture = capture
         self.strings = strings
         self.debug = debug
@@ -102,102 +153,164 @@ class quicksand:
         self.results['feature'] = 0
         self.results['packages'] = []
         self.timeout = timeout
-        self.structure = ""
+        
         if self.capture:
             self.results['streams'] = {}
         
-
-        if os.path.isfile(data):
+        # Handle data as file path or raw bytes
+        if isinstance(data, str) and Path(data).is_file():
             self.results['filename'] = data
-            self.data = quicksand.readFile(self, data)
+            self.data = self.readFile(data)
         else:
             self.results['filename'] = None
             self.data = data
-        if exploityara != None:
+            
+        # Override default YARA rule paths if provided
+        if exploityara is not None:
             self.exploityara = exploityara
-        if execyara != None:
+        if execyara is not None:
             self.execyara = execyara
-        if pdfyara != None:
+        if pdfyara is not None:
             self.pdfyara = pdfyara
             
+        # Compile YARA rules
         self.exploitrules = yara.compile(filepath=self.exploityara)
         self.execrules = yara.compile(filepath=self.execyara)
         self.pdfrules = yara.compile(filepath=self.pdfyara)
            
 
+    def format_yara_strings(self, match_strings: List) -> str:
+        """Convert Yara match strings to a readable string format.
+        
+        Args:
+            match_strings: List of YARA match strings objects
+            
+        Returns:
+            Formatted string representation of the matches
+        """
+        if not match_strings:
+            return ""
+        
+        result = []
+        
+        # YARA 4.3.0+ API
+        for match in match_strings:
+            # Check if this is a StringMatch object (YARA 4.3.0+)
+            if hasattr(match, 'identifier') and hasattr(match, 'instances'):
+                identifier = match.identifier
+                # Loop through all instances of this match
+                for instance in match.instances:
+                    if hasattr(instance, 'matched_data') and hasattr(instance, 'offset'):
+                        offset = instance.offset
+                        data = instance.matched_data
+                        
+                        # Try to decode the data
+                        try:
+                            string_data = data.decode('utf-8', errors='replace')
+                        except (UnicodeDecodeError, AttributeError):
+                            string_data = data.hex() if data else "[empty]"
+                        
+                        result.append(f"{identifier} at offset {offset}: {string_data}")
+            
+            # Fallback for older YARA versions or direct tuple access
+            elif isinstance(match, tuple) and len(match) >= 3:
+                identifier, offset, data = match
+                try:
+                    string_data = data.decode('utf-8', errors='replace')
+                except (UnicodeDecodeError, AttributeError):
+                    string_data = data.hex() if data else "[empty]"
+                result.append(f"{identifier} at offset {offset}: {string_data}")
+            
+            # Last resort fallback
+            else:
+                try:
+                    result.append(f"Match data: {str(match)}")
+                except Exception:
+                    result.append("Unprocessable match data")
+        
+        return "\n".join(result)
 
-    def carve(item, separator):
-        return [separator+e for e in item.split(separator) if e]
+    @staticmethod
+    def carve(item: bytes, separator: bytes) -> List[bytes]:
+        """Split binary data on a separator and return the items.
+        
+        Args:
+            item: Binary data to split
+            separator: Separator to split on
+            
+        Returns:
+            List of binary chunks
+        """
+        return [separator + e for e in item.split(separator) if e]
 
 
-    def scan_exploit(self, item, loc):
+    def scan_exploit(self, item: bytes, loc: str) -> None:
+        """Scan data for exploits using YARA rules.
+        
+        Args:
+            item: Binary data to scan
+            loc: Location identifier for reporting
+        """
         matches = self.exploitrules.match(data=item)
 
-        if matches:
-            for m in matches:
-                rtype = "exploit"
-                desc = ""
-                mitre = ""
-                rank = None
-                is_exe = False
-                is_feature = False
-                is_warning = False
-                is_exploit = False
-                
-                try:
-                    desc = m.meta['desc']
-                except:
-                    None
-                try:
-                    mitre = m.meta['mitre']
-                except:
-                    None
-                try:
-                    rank = m.meta['rank']
-                except:
-                    None
-                try:
-                    is_exe = m.meta['is_exe']
-                    if is_exe == True:
-                         self.results['execute'] += 1
-                except:
-                    None
-                try:
-                    is_exploit = m.meta['is_exploit']
-                    if is_exploit == True:
-                         self.results['exploit'] += 1
-                except:
-                    None
-                try:
-                    is_warning = m.meta['is_warning']
-                    if is_warning == True:
-                         self.results['warning'] += 1
-                except:
-                    None
-                try:
-                    is_feature = m.meta['is_feature']
-                    if is_feature == True:
-                         self.results['feature'] += 1
-                except:
-                    None
+        if not matches:
+            return
 
+        for match in matches:
+            rule_type = "exploit"
+            desc = ""
+            mitre = ""
+            rank = None
+            is_exe = False
+            is_feature = False
+            is_warning = False
+            is_exploit = False
+            
+            # Extract metadata from the match
+            try:
+                desc = match.meta.get('desc', "")
+                mitre = match.meta.get('mitre', "")
+                rank = match.meta.get('rank')
+                
+                is_exe = match.meta.get('is_exe', False)
+                if is_exe:
+                    self.results['execute'] += 1
                     
-                if rank != None:
-                    self.results['score'] += int(rank)
-                        
-                if loc in self.results['results']:
-                    if self.strings:
-                        self.results['results'][loc].append({'rule': m.rule, 'desc': desc, 'strings': m.strings, 'type': rtype, 'mitre': mitre})
-                    else:
-                        self.results['results'][loc].append({'rule': m.rule, 'desc': desc, 'type': rtype, 'mitre': mitre})
+                is_exploit = match.meta.get('is_exploit', False)
+                if is_exploit:
+                    self.results['exploit'] += 1
+                    
+                is_warning = match.meta.get('is_warning', False)
+                if is_warning:
+                    self.results['warning'] += 1
+                    
+                is_feature = match.meta.get('is_feature', False)
+                if is_feature:
+                    self.results['feature'] += 1
+            except (AttributeError, KeyError) as e:
+                self.msg(f"Error extracting metadata: {e}")
+                
+            # Update score if rank is available
+            if rank is not None:
+                self.results['score'] += int(rank)
+            
+            # Format matched strings if enabled
+            if self.strings:
+                if isinstance(match.strings, list):
+                    formatted_strings = self.format_yara_strings(match.strings)
                 else:
-                    if self.strings:
-                        self.results['results'][loc] = [{'rule': m.rule, 'desc': desc, 'strings': m.strings, 'type': rtype, 'mitre': mitre}]
-                    else:
-                        self.results['results'][loc] = [{'rule': m.rule, 'desc': desc, 'type': rtype, 'mitre': mitre}]
-                        
-                quicksand.msg(self, "YARA EXPLOIT: " + str(loc)+ ":" + str(m.rule))
-                #quicksand.msg(self, m.strings)
+                    formatted_strings = str(match.strings)
+                result_entry = {'rule': match.rule, 'desc': desc, 'strings': formatted_strings, 'type': rule_type, 'mitre': mitre}
+            else:
+                result_entry = {'rule': match.rule, 'desc': desc, 'type': rule_type, 'mitre': mitre}
+            
+            # Add the result to the appropriate location
+            if loc in self.results['results']:
+                self.results['results'][loc].append(result_entry)
+            else:
+                self.results['results'][loc] = [result_entry]
+                
+            self.msg(f"YARA EXPLOIT: {loc}:{match.rule}")
 
 
 
@@ -258,12 +371,20 @@ class quicksand:
                        
                 if loc in self.results['results']:
                     if self.strings:
-                        self.results['results'][loc].append({'rule': m.rule, 'desc': desc, 'strings': m.strings, 'type': rtype, 'mitre': mitre})
+                        if isinstance(m.strings, list):
+                            formatted_strings = self.format_yara_strings(m.strings)
+                        else:
+                            formatted_strings = str(m.strings)
+                        self.results['results'][loc].append({'rule': m.rule, 'desc': desc, 'strings': formatted_strings, 'type': rtype, 'mitre': mitre})
                     else:
                         self.results['results'][loc].append({'rule': m.rule, 'desc': desc, 'type': rtype, 'mitre': mitre})
                 else:
                     if self.strings:
-                        self.results['results'][loc] = [{'rule': m.rule, 'desc': desc, 'strings': m.strings, 'type': rtype, 'mitre': mitre}]
+                        if isinstance(m.strings, list):
+                            formatted_strings = self.format_yara_strings(m.strings)
+                        else:
+                            formatted_strings = str(m.strings)
+                        self.results['results'][loc] = [{'rule': m.rule, 'desc': desc, 'strings': formatted_strings, 'type': rtype, 'mitre': mitre}]
                     else:
                         self.results['results'][loc] = [{'rule': m.rule, 'desc': desc, 'type': rtype, 'mitre': mitre}]
                 #quicksand.msg(self, "YARA EXEC: "+ str(loc)+ ":" + str(m.rule))
@@ -327,12 +448,20 @@ class quicksand:
                         
                 if loc in self.results['results']:
                     if self.strings:
-                        self.results['results'][loc].append({'rule': m.rule, 'desc': desc, 'strings': m.strings, 'type': rtype, 'mitre': mitre})
+                        if isinstance(m.strings, list):
+                            formatted_strings = self.format_yara_strings(m.strings)
+                        else:
+                            formatted_strings = str(m.strings)
+                        self.results['results'][loc].append({'rule': m.rule, 'desc': desc, 'strings': formatted_strings, 'type': rtype, 'mitre': mitre})
                     else:
                         self.results['results'][loc].append({'rule': m.rule, 'desc': desc, 'type': rtype, 'mitre': mitre})
                 else:
                     if self.strings:
-                        self.results['results'][loc] = [{'rule': m.rule, 'desc': desc, 'strings': m.strings, 'type': rtype, 'mitre': mitre}]
+                        if isinstance(m.strings, list):
+                            formatted_strings = self.format_yara_strings(m.strings)
+                        else:
+                            formatted_strings = str(m.strings)
+                        self.results['results'][loc] = [{'rule': m.rule, 'desc': desc, 'strings': formatted_strings, 'type': rtype, 'mitre': mitre}]
                     else:
                         self.results['results'][loc] = [{'rule': m.rule, 'desc': desc, 'type': rtype, 'mitre': mitre}]
  
@@ -355,19 +484,19 @@ class quicksand:
             #quicksand.msg(self, pdf.pages())
             #quicksand.msg(self, pdf.catalog())
             #quicksand.msg(self, pdf.parser)
-            for block in re.findall(b'((\x0a|\x0d|\x20)(\d{1,4})[^\d]{1,3}(\d{1,2})\sobj|(\x0a|\x0d)(xref|trailer)(\x0a|\x0d))',doc):
+            for block in re.findall(rb'((\x0a|\x0d|\x20)(\d{1,4})[^\d]{1,3}(\d{1,2})\sobj|(\x0a|\x0d)(xref|trailer)(\x0a|\x0d))',doc):
                 if len(block[2]) != 0:
                     num = int(block[2])
                     gen = int(block[3])
-                    quicksand.msg (self,"obj " + str(num) + " " + str(gen))
-                    self.structure += str(num) + "-" + str(gen) + ","
+                    self.msg(f"obj {num} {gen}")
+                    self.structure += f"{num}-{gen},"
                 else:
-                    self.structure += block[5].decode("utf-8")  + ","
-                    quicksand.msg (self,"obj " + str(block[5].decode("utf-8")) )
+                    self.structure += block[5].decode("utf-8") + ","
+                    self.msg(f"obj {block[5].decode('utf-8')}")
 
             # validate that there's no hidden pdf objects by parsing them out
-            for block in re.findall(b'((\x0a|\x0d|\x20)(\d{1,4})[^\d]{1,3}(\d{1,2})\sobj(\x0a|\x0d|\x20)<<[^>]{1,200}\x2fFilter)',doc):
-                quicksand.msg(self, block)
+            for block in re.findall(rb'((\x0a|\x0d|\x20)(\d{1,4})[^\d]{1,3}(\d{1,2})\sobj(\x0a|\x0d|\x20)<<[^>]{1,200}\x2fFilter)',doc):
+                self.msg(block)
                 if self.timeout > 0 and time.time() - self.results['started'] > self.timeout:
                     self.results['skip'] = 1
                     continue
@@ -377,39 +506,41 @@ class quicksand:
                 if block[2]:
                     num = int(block[2])
                     gen = int(block[3])
-                    quicksand.msg (self,"stream " + str(num) + " " + str(gen))
+                    self.msg(f"stream {num} {gen}")
                     
                     try:
                         raw_obj = pdf.locate_object(num, gen)
 
                         obj = pdf.build(raw_obj)
                     except Exception as e:
-                        quicksand.msg(self, e)
+                        self.msg(e)
                         
                     try:
                         if type(obj) == pdfreader.types.objects.StreamBasedObject:
                             #quicksand.msg(self, "scan stream " + str (obj.get('Filter')) + " " + str(len(obj.filtered)))
                             #quicksand.scan_pdf(self, obj.data,str(loc) + "-pdf_" + str(num) + "_" + str(gen))
-                            quicksand.scan_pdf(self, obj.filtered,str(loc) + "-pdf_" + str(num) + "_" + str(gen))
+                            pdf_object_loc = f"{loc}-pdf_{num}_{gen}"
+                            quicksand.scan_pdf(self, obj.filtered, pdf_object_loc)
                             if self.capture:
-                                self.results['streams'][str(loc) + "-pdf_" + str(num) + "_" + str(gen)] = obj.filtered
+                                self.results['streams'][pdf_object_loc] = obj.filtered
                         #else:
                             #quicksand.msg(self, obj)
                     except Exception as e:
-                        quicksand.msg(self, e)
+                        self.msg(e)
             
                 else:
                     #quicksand.msg (self,"special " + str(block[5].decode()) )
                     None
         except Exception as e:
-            
-            quicksand.msg(self, "Error parsing PDF due to " + str(e))
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            line_number = exc_traceback.tb_lineno
+            self.msg(f"Error parsing PDF on line {line_number} due to {e}")
             
 
             if loc in self.results['results']:
-                self.results['results'][loc].append({'rule': "pdf_malformed", 'desc': "WARNING: PDF is malformed", 'strings': '', 'type': 'structure'})
+                self.results['results'][loc].append({'rule': "pdf_malformed", 'desc': f"WARNING: PDF is malformed. Error parsing PDF on line {line_number} due to {e}", 'strings': '', 'type': 'structure'})
             else:
-                self.results['results'][loc] = [{'rule': "pdf_malformed", 'desc': "WARNING: PDF is malformed", 'strings': '', 'type': 'structure'}]
+                self.results['results'][loc] = [{'rule': "pdf_malformed", 'desc': f"WARNING: PDF is malformed. Error parsing PDF on line {line_number} due to {e}", 'strings': '', 'type': 'structure'}]
            
 
 
@@ -439,7 +570,7 @@ class quicksand:
         except:
             obj = block
 
-        quicksand.msg(self, "RTF obj size " + str(len(obj)))
+        self.msg(f"RTF obj size {len(obj)}")
         if self.capture:
             self.results['streams'][loc] = obj
         
@@ -448,58 +579,58 @@ class quicksand:
         quicksand.scan_exec(self, obj, str(loc))
         #extract OLE files
         if re.search(binascii.unhexlify(b'd0cf11e0'), obj, re.IGNORECASE):
-            quicksand.msg(self, str(loc) + "has embedded ole doc")
+            self.msg(f"{loc} has embedded ole doc")
             elements = quicksand.carve(obj, binascii.unhexlify(b'd0cf11e0'))
             elements.pop(0)
-            quicksand.msg (self,"there may this many ole " + str(len(elements)))
+            self.msg(f"There may be this many ole: {len(elements)}")
 
             directory = 0
             for i in range(0, len(elements)):
                 #quicksand.msg(self, elements[i])
-                newloc = "ole" + str(i)
-                self.structure += str(newloc) + ","
+                newloc = f"ole{i}"
+                self.structure += f"{newloc},"
 
-                r = quicksand.analyse_ole(self, elements[i], str(loc) + "-" + str(newloc))
+                r = quicksand.analyse_ole(self, elements[i], f"{loc}-{newloc}")
                 if self.capture:
-                    self.results['streams'][str(loc) + str(newloc)] = elements[i]
+                    self.results['streams'][f"{loc}{newloc}"] = elements[i]
 
                 if "negative" in str(r) and len(elements) > 1:
-                    quicksand.msg (self,"range " + str(directory) + " " + str(i))
-                    r = quicksand.analyse_ole(self, b''.join(elements[directory : i+1]),str(loc) + "-oleg" + str(directory) + "-" + str(i))
+                    self.msg(f"range {directory} {i}")
+                    r = quicksand.analyse_ole(self, b''.join(elements[directory : i+1]), f"{loc}-oleg{directory}-{i}")
 
                     directory = i+1
                     if self.capture:
-                        self.results['streams'][str(loc) + "-oler" + str(directory) + "-" +str(i)] = b''.join(elements[directory : i+1])
+                        self.results['streams'][f"{loc}-oler{directory}-{i}"] = b''.join(elements[directory : i+1])
                     else:
                         if self.capture:
-                            self.results['streams'][str(loc) + "-olea-" + str(i)] =  elements[i]
+                            self.results['streams'][f"{loc}-olea-{i}"] =  elements[i]
 
         #extract openxml zip
         if re.search(binascii.unhexlify(b'504B030414000600'), obj, re.IGNORECASE):
-            quicksand.msg(self, "has embedded openxml doc")
+            self.msg("has embedded openxml doc")
             elements = quicksand.carve(obj, binascii.unhexlify(b'504B030414000600'))
             elements.pop(0)
             #quicksand.msg (self,"there may this many openxml " + str(len(elements)))
 
             directory = 0
             for i in range(0, len(elements)):
-                quicksand.msg(self, element)
-                quicksand.msg (self," -element 1 ")
-                newloc = "openxml" + str(i)
-                self.structure += str(newloc) + ","
-                r = quicksand.analyse_openxml(self, elements[i], str(loc) + "-" + str(newloc))
+                self.msg(element)
+                self.msg(" -element 1 ")
+                newloc = f"openxml{i}"
+                self.structure += f"{newloc},"
+                r = quicksand.analyse_openxml(self, elements[i], f"{loc}-{newloc}")
                 if self.capture:
-                    self.results['streams'][str(loc) + str(newloc)] = elements[i]
+                    self.results['streams'][f"{loc}{newloc}"] = elements[i]
 
                 if "negative" in str(r) and len(elements) > 1:
-                    quicksand.msg (self,"range " + str(directory) + " " + str(i))
-                    r = quicksand.analyse_openxml(self, b''.join(elements[directory : i+1]),str(loc) + "-openxmlg" + str(directory) + "-" +str(i))
+                    self.msg(f"range {directory} {i}")
+                    r = quicksand.analyse_openxml(self, b''.join(elements[directory : i+1]), f"{loc}-openxmlg{directory}-{i}")
                     directory = i+1
                     if self.capture:
-                        self.results['streams'][str(loc) + "-openxmlr" + str(directory) + "-" +str(i)] = b''.join(elements[directory : i+1])
+                        self.results['streams'][f"{loc}-openxmlr{directory}-{i}"] = b''.join(elements[directory : i+1])
                 else:
                     if self.capture:
-                        self.results['streams'][str(loc) + "-openxmla" + str(i)] = elements[i]
+                        self.results['streams'][f"{loc}-openxmla{i}"] = elements[i]
 
 
     def analyse_rtf(self, doc, loc):
@@ -601,7 +732,7 @@ class quicksand:
         quicksand.scan_exploit(self, doc, str(loc))
         quicksand.scan_exec(self, doc, str(loc))
 
-        for block in re.findall(b'([a-zA-Z0-9\/+=\x0a\x0d]{1024,})',doc):
+        for block in re.findall(rb'([a-zA-Z0-9\/+=\x0a\x0d]{1024,})',doc):
             #quicksand.msg (self,block)
             if block[:3] == b'mso':
                 decoded = base64.decodebytes(block[3:])
@@ -885,104 +1016,134 @@ class quicksand:
                         self.results['streams'][str(loc) + "-openxml" + str(i)] =  elements[i]
                     
 
-    def metadata(self):
+    def metadata(self) -> None:
+        """Populate the results with file metadata."""
         self.results['md5'] = hashlib.md5(self.data).hexdigest()
         self.results['sha1'] = hashlib.sha1(self.data).hexdigest()
         self.results['sha256'] = hashlib.sha256(self.data).hexdigest()
         self.results['sha512'] = hashlib.sha512(self.data).hexdigest()
         self.results['size'] = len(self.data)
         self.results['started'] = time.time()
-        self.results['version'] = quicksand.__version__
+        self.results['version'] = self.__version__
         self.results['quicksand_exploits.yara'] = os.path.getmtime(self.exploityara)
         self.results['quicksand_exe.yara'] = os.path.getmtime(self.execyara)
         self.results['quicksand_pdf.yara'] = os.path.getmtime(self.pdfyara)
         self.results['header'] = self.data[0:16].hex()
-       
     
-    def sumString(item):
-        valid = []
-        val = 0
-        for i in item:
-            #quicksand.msg(self, i)
-            val += ord(i)
-            #quicksand.msg (self,val)
-        #quicksand.msg (self,"sum " + str(val) + " " + string.ascii_letters[int(val % len(string.ascii_letters))])
+    @staticmethod
+    def sum_string(item: str) -> str:
+        """Calculate a fuzzy hash based on string characters.
+        
+        Args:
+            item: String to hash
+            
+        Returns:
+            Single character hash value
+        """
+        val = sum(ord(i) for i in item)
         return string.ascii_letters[int(val % len(string.ascii_letters))]
     
-    def fuzzStructure(self):
-        out = ''
-        for element in self.structure.split(','):
-            #quicksand.msg(self, element)
-            out += quicksand.sumString(element)
-        return out
+    def fuzz_structure(self) -> str:
+        """Create a fuzzy hash of the document structure.
+        
+        Returns:
+            Fuzzy hash string
+        """
+        return ''.join(self.sum_string(element) for element in self.structure.split(',') if element)
 
-    def process(self):
-        quicksand.metadata(self)
-        quicksand.analyse(self, self.data, "root")
+    def process(self) -> None:
+        """Process the document and generate results."""
+        self.metadata()
+        self.analyze(self.data, "root")
+        
+        # Calculate risk level
         self.results['risk'] = "nothing detected"
         self.results['rating'] = 0
+        
         if self.results['score'] > 0:
             self.results['risk'] = "risky active content"
             self.results['rating'] = 1
+            
         if self.results['score'] >= 5:
             self.results['risk'] = "high risk active content"
             self.results['rating'] = 2
+            
         if self.results['exploit'] > 0:
             self.results['risk'] = "risk of exploit"
             self.results['rating'] = 2
+            
         if self.results['exploit'] >= 3:
             self.results['risk'] = "high risk of exploit"
             self.results['rating'] = 3
+            
+        # Finalize the structure and structure hash
         self.structure = self.structure.rstrip(",")
         self.results['structhash'] = hashlib.md5(self.structure.encode("utf-8")).hexdigest()
         self.results['structure'] = self.structure
         self.results['structhash_version'] = "1.0.3"
-        self.results['structhash_elements'] = self.structure.count(',')+1 
-        self.results['struzzy'] = quicksand.fuzzStructure(self)
+        self.results['structhash_elements'] = self.structure.count(',') + 1 
+        self.results['struzzy'] = self.fuzz_structure()
+        
+        # Record completion time
         self.results['finished'] = time.time()
         self.results['elapsed'] = self.results['finished'] - self.results['started']
+
+    def analyze(self, doc: bytes, loc: str) -> None:
+        """Analyze document bytes to detect exploits.
         
-
-    def analyse(self, doc, loc):
-
-        type = quicksand.checkHeader(doc)
-        quicksand.msg(self, str(type) + " SCAN " + str(loc))
-        self.structure += str(type) + ":" + str(loc) + ","
+        Args:
+            doc: Binary document data to analyze
+            loc: Location identifier for reporting
+        """
+        doc_type = self.check_header(doc)
+        self.msg(f"{doc_type} SCAN {loc}")
+        self.structure += f"{doc_type}:{loc},"
         
         if loc == "root":
-            self.results['type'] = type
+            self.results['type'] = doc_type
 
-        if type == "ole":
-            quicksand.analyse_ole(self, doc, loc)
-        elif type == "openxml":
-            quicksand.analyse_openxml(self, doc, loc)
-        elif type == "rtf":
-            quicksand.analyse_rtf(self, doc, loc)
-        elif type == "mso":
-            quicksand.analyse_mso(self, doc, loc)
-        elif type == "pdf":
-            quicksand.analyse_pdf(self, doc, loc)
-        elif type == "ps":
-            quicksand.analyse_ps(self, doc, loc)
+        # Process the document according to its type
+        if doc_type == "ole":
+            self.analyse_ole(doc, loc)
+        elif doc_type == "openxml":
+            self.analyse_openxml(doc, loc)
+        elif doc_type == "rtf":
+            self.analyse_rtf(doc, loc)
+        elif doc_type == "mso":
+            self.analyse_mso(doc, loc)
+        elif doc_type == "pdf":
+            self.analyse_pdf(doc, loc)
+        elif doc_type == "ps":
+            self.analyse_ps(doc, loc)
         else:
-            quicksand.scan_exploit(self, doc, loc)
-            quicksand.scan_exec(self, doc, loc)
+            # For unknown types, just scan for exploits
+            self.scan_exploit(doc, loc)
+            self.scan_exec(doc, loc)
+            
+    # Keep the original method name for backward compatibility
+    analyse = analyze
 
-
-
-    def checkHeader(doc):
-        #quicksand.msg(self, doc[0:256])
+    @staticmethod
+    def check_header(doc: bytes) -> str:
+        """Determine document type based on header bytes.
+        
+        Args:
+            doc: Binary document data
+            
+        Returns:
+            String indicating the detected file type
+        """
         if re.search(binascii.unhexlify('5c5C7274'), doc[0:256], re.IGNORECASE):
             return "rtf"
         elif doc[:4] == binascii.unhexlify(b'd0cf11e0'):
             return "ole"
-        elif  re.search(b'\x50\x4B\x03\x04\x14\x00', doc, re.IGNORECASE): # should be deeper
+        elif re.search(b'\x50\x4B\x03\x04\x14\x00', doc, re.IGNORECASE): # should be deeper
             return "openxml"
         elif doc[:2] == b'PK':
             return "zip"
         elif re.search(b'%PDF', doc[0:1024], re.IGNORECASE):
             return "pdf"
-        elif re.search(b'ns.adobe.com\/xdp', doc[0:1024], re.IGNORECASE):
+        elif re.search(rb'ns.adobe.com\/xdp', doc[0:1024], re.IGNORECASE):
             return "xdp"
         elif re.search(b'MIME-Version', doc[0:256], re.IGNORECASE):
             return "mso"
@@ -992,4 +1153,7 @@ class quicksand:
             return "ps"
         else:
             return "data"
+            
+    # Keep the original method name for backward compatibility
+    checkHeader = check_header
 

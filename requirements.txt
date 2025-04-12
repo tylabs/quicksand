@@ -4,4 +4,4 @@ cryptography
 zipfile38
 msoffcrypto-tool
 olefile
-yara-python
+yara-python>=4.3.0

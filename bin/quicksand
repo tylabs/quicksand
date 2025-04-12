@@ -1,160 +1,311 @@
 #!/usr/bin/env python
+"""
+QuickSand - CLI tool for document malware detection and analysis.
+
+This script provides a command-line interface to the QuickSand library,
+allowing users to analyze documents for potential malware and exploits.
+"""
 
 from quicksand.quicksand import quicksand
-import os.path
 import sys
 import argparse
 import json
 import re
+from pathlib import Path
+from typing import Dict, Any, List, Union, Optional
 
-__version__ = '2.0.11'
+__version__ = '2.1.0'
 __author__ = "Tyler McLellan"
-__copyright__ = "Copyright 2021, @tylabs"
+__copyright__ = "Copyright 2025, @tylabs"
 __license__ = "MIT"
 
 
-
-# fix for bytes from https://stackoverflow.com/questions/57014259/json-dumps-on-dictionary-with-bytes-for-keys
-# your dump code for values, unmodified
 class BytesDump(json.JSONEncoder):
+    """JSON encoder that handles bytes serialization."""
+    
     def default(self, obj):
+        """Convert bytes to string for JSON serialization.
+        
+        Args:
+            obj: Object to serialize
+            
+        Returns:
+            Serialized object
+        """
         if isinstance(obj, bytes):
             return obj.decode(errors='replace')
         return json.JSONEncoder.default(self, obj)
 
-# recursive key as string conversion for byte keys
-def keys_string(d):
-    rval = {}
+
+def keys_string(d: Any) -> Any:
+    """Recursively convert byte keys in dictionaries to strings.
+    
+    Args:
+        d: Input data (dict, list, or other value)
+        
+    Returns:
+        Data with all byte keys converted to strings
+    """
     if not isinstance(d, dict):
-        if isinstance(d,(tuple,list,set)):
-            v = [keys_string(x) for x in d]
-            return v
+        if isinstance(d, (tuple, list, set)):
+            return [keys_string(x) for x in d]
         else:
             return d
 
-    for k,v in d.items():
-        if isinstance(k,bytes):
+    rval = {}
+    for k, v in d.items():
+        if isinstance(k, bytes):
             k = k.decode()
-        if isinstance(v,dict):
+        if isinstance(v, dict):
             v = keys_string(v)
-        elif isinstance(v,(tuple,list,set)):
+        elif isinstance(v, (tuple, list, set)):
             v = [keys_string(x) for x in v]
         rval[k] = v
     return rval
 
 
-def txtOut(results):
-    out = "QuickSand Results " + str(results['version']) +  "\n\nMETADATA\n\n"
-    out += "{:<20}: {}".format("filename", results['filename']) + "\n"
-    out += "{:<20}: {}".format("type", results['type']) + "\n"
-    out += "{:<20}: {}".format("md5", results['md5']) + "\n"
-    out += "{:<20}: {}".format("sha1", results['sha1']) + "\n"
-    out += "{:<20}: {}".format("sha256", results['sha256']) + "\n"
-    out += "{:<20}: {}".format("size", results['size']) + "\n"
-    out += "\n"
-    out += "{:<20}: {}".format("started", results['started']) + "\n"
-    out += "{:<20}: {}".format("finished", results['finished']) + "\n"
-    out += "{:<20}: {}".format("elapsed", results['elapsed']) + "\n"
-    out += "\n\nSIMILARITY "+ str(results['structhash_version']) + "\n\n"
-    out += "{:<20}: {}".format("structhash", results['structhash']) + "\n"
-    out += "{:<20}: {}".format("struzzy", results['struzzy']) + "\n"
-    out += "{:<20}: {}".format("header", results['header']) + "\n"
-    out += "\n\nRESULT\n\n"
-    out += "{:<20}: {}".format("risk", results['risk']) + "\n"
-    out += "{:<20}: {}".format("score", results['score']) + "\n\n"
-    out += json.dumps(keys_string(results['results']), cls=BytesDump,sort_keys=True, indent=4) + "\n"
+def txt_out(results: Dict[str, Any]) -> str:
+    """Generate a text report of QuickSand results.
+    
+    Args:
+        results: The QuickSand results dictionary
+        
+    Returns:
+        Formatted text report
+    """
+    out = f"QuickSand Results {results['version']}\n\nMETADATA\n\n"
+    out += f"{'filename':<20}: {results['filename']}\n"
+    out += f"{'type':<20}: {results['type']}\n"
+    out += f"{'md5':<20}: {results['md5']}\n"
+    out += f"{'sha1':<20}: {results['sha1']}\n"
+    out += f"{'sha256':<20}: {results['sha256']}\n"
+    out += f"{'size':<20}: {results['size']}\n\n"
+    out += f"{'started':<20}: {results['started']}\n"
+    out += f"{'finished':<20}: {results['finished']}\n"
+    out += f"{'elapsed':<20}: {results['elapsed']}\n"
+    out += f"\n\nSIMILARITY {results['structhash_version']}\n\n"
+    out += f"{'structhash':<20}: {results['structhash']}\n"
+    out += f"{'struzzy':<20}: {results['struzzy']}\n"
+    out += f"{'header':<20}: {results['header']}\n"
+    out += f"\n\nRESULT\n\n"
+    out += f"{'risk':<20}: {results['risk']}\n"
+    out += f"{'score':<20}: {results['score']}\n\n"
+    out += json.dumps(keys_string(results['results']), cls=BytesDump, sort_keys=True, indent=4) + "\n"
     return out
 
-def main(args=None):
 
-    parser = argparse.ArgumentParser(description='QuickSand Document and PDF maldoc analysis tool.')
-    parser.add_argument('document', type=str, help='document or directory to scan')
-
-    parser.add_argument("-v", "--verbose", help="increase output verbosity",
-                    action="store_true")
-    parser.add_argument("-c", "--capture", help="capture stream content",
-                    action="store_true")
-    parser.add_argument("-y", "--yara", help="capture yara matched strings",
-                    action="store_true")
-    parser.add_argument("-t", "--timeout", help="timeout in seconds", default=0,
-                    type=int)
-    parser.add_argument("-e", "--exploit", help="yara exploit signatures", default=None, type=str)
-    parser.add_argument("-x", "--exe", help="yara executable signatures", default=None, type=str)
-    parser.add_argument("-a", "--pdf", help="yara PDF signatures", default=None, type=str)
-    parser.add_argument("-f", "--format", help="output format", type=str,
-        choices=['json', 'txt'], default='json')
-    parser.add_argument("-o", "--out", help="save output to this filename", default=None, type=str)
-    parser.add_argument("-p", "--password", help="password to decrypt ole or pdf", default=None, type=str)
-    parser.add_argument("-d", "--dropdir", help="save objects to this directory", default=None, type=str)
- 
-    args = parser.parse_args()
-    if args.dropdir != None:
-        args.capture=True
-
-    if os.path.isfile(args.document):
-        qs = quicksand(args.document, debug=args.verbose, capture=args.capture, strings=args.yara,
-            timeout=args.timeout, exploityara=args.exploit, execyara=args.exe, pdfyara=args.pdf, password=args.password)
-        qs.process()
-        if args.dropdir != None:
-            if not os.path.isdir(args.dropdir):
-                os.mkdir(args.dropdir)
-                print ("Creating directory " + str(args.dropdir))
-            if os.path.isdir(args.dropdir):
-                for item in qs.results['streams']:
-                    safe_name=re.sub('[^a-zA-Z0-9-_]', '_', item)
-                    f = open(args.dropdir + "/" + str(safe_name), 'wb')
-                    f.write(qs.results['streams'][item])
-                    f.close()
-            else:
-                print ("Unable to write to " + str(args.dropdir))
+def save_streams(streams: Dict[str, bytes], output_dir: Path, prefix: str = "") -> None:
+    """Save extracted streams to disk.
+    
+    Args:
+        streams: Dictionary mapping stream names to binary content
+        output_dir: Directory to save streams in
+        prefix: Optional filename prefix (e.g., document hash)
+    """
+    for item, content in streams.items():
+        safe_name = re.sub(r'[^a-zA-Z0-9-_]', '_', item)
+        file_path = output_dir / f"{prefix}{safe_name}"
+        with open(file_path, 'wb') as f:
+            f.write(content)
 
 
-        if args.out:
-            with open(args.out, 'w') as outfile:
-                if args.format == 'json':
-                    json.dump(keys_string(qs.results), outfile, cls=BytesDump,sort_keys=True, indent=4)
-                else:
-                    outfile.write(txtOut(qs.results))
+def process_file(file_path: str, args: argparse.Namespace) -> None:
+    """Process a single file with QuickSand.
+    
+    Args:
+        file_path: Path to the file to analyze
+        args: Command line arguments
+    """
+    qs = quicksand(
+        file_path, 
+        debug=args.verbose, 
+        capture=args.capture, 
+        strings=args.yara,
+        timeout=args.timeout, 
+        exploityara=args.exploit, 
+        execyara=args.exe, 
+        pdfyara=args.pdf, 
+        password=args.password
+    )
+    qs.process()
+    
+    # Save extracted streams if requested
+    if args.dropdir:
+        drop_dir = Path(args.dropdir)
+        if not drop_dir.exists():
+            drop_dir.mkdir(parents=True)
+            print(f"Creating directory {args.dropdir}")
+            
+        if drop_dir.is_dir():
+            save_streams(qs.results['streams'], drop_dir)
         else:
+            print(f"Unable to write to {args.dropdir}")
+
+    # Output results
+    if args.out:
+        with open(args.out, 'w') as outfile:
             if args.format == 'json':
-                print (json.dumps(keys_string(qs.results), cls=BytesDump,sort_keys=True, indent=4))
+                json.dump(keys_string(qs.results), outfile, cls=BytesDump, sort_keys=True, indent=4)
             else:
-               print(txtOut(qs.results))
- 
-    elif os.path.isdir(args.document):
-        out = quicksand.readDir(args.document,debug=args.verbose, capture=args.capture, strings=args.yara,
-            timeout=args.timeout, exploityara=args.exploit, execyara=args.exe, pdfyara=args.pdf, password=args.password)
-        if args.dropdir != None:
-            if not os.path.isdir(args.dropdir):
-                os.mkdir(args.dropdir)
-                print ("Creating directory " + str(args.dropdir))
-            if os.path.isdir(args.dropdir):
-                for doc in out:
-                    for item in out[doc]['streams']:
-                        safe_name=re.sub('[^a-zA-Z0-9-_]', '_', item)
-                        f = open(args.dropdir + "/" + out[doc]['md5'] + "_" + str(safe_name), 'wb')
-                        f.write(out[doc]['streams'][item])
-                        f.close()
-            else:
-                print ("Unable to write to " + str(args.dropdir))
-
-
-        if args.out:
-            with open(args.out, 'w') as outfile:
-                if args.format == 'json':
-                    json.dump(keys_string(out), outfile, cls=BytesDump,sort_keys=True, indent=4)
-                else:
-                    for doc in out:
-                        outfile.write(txtOut(out[doc]))
+                outfile.write(txt_out(qs.results))
+    else:
+        if args.format == 'json':
+            print(json.dumps(keys_string(qs.results), cls=BytesDump, sort_keys=True, indent=4))
         else:
+            print(txt_out(qs.results))
+
+
+def process_directory(dir_path: str, args: argparse.Namespace) -> None:
+    """Process all files in a directory with QuickSand.
+    
+    Args:
+        dir_path: Path to the directory containing files to analyze
+        args: Command line arguments
+    """
+    results = quicksand.readDir(
+        dir_path,
+        debug=args.verbose, 
+        capture=args.capture, 
+        strings=args.yara,
+        timeout=args.timeout, 
+        exploityara=args.exploit, 
+        execyara=args.exe, 
+        pdfyara=args.pdf, 
+        password=args.password
+    )
+    
+    # Save extracted streams if requested
+    if args.dropdir:
+        drop_dir = Path(args.dropdir)
+        if not drop_dir.exists():
+            drop_dir.mkdir(parents=True)
+            print(f"Creating directory {args.dropdir}")
+            
+        if drop_dir.is_dir():
+            for doc_path, doc_results in results.items():
+                if 'streams' in doc_results:
+                    prefix = f"{doc_results['md5']}_"
+                    save_streams(doc_results['streams'], drop_dir, prefix)
+        else:
+            print(f"Unable to write to {args.dropdir}")
+
+    # Output results
+    if args.out:
+        with open(args.out, 'w') as outfile:
             if args.format == 'json':
-                print(json.dumps(keys_string(out), cls=BytesDump,sort_keys=True, indent=4))
+                json.dump(keys_string(results), outfile, cls=BytesDump, sort_keys=True, indent=4)
             else:
-                for doc in out:
-                    print(txtOut(out[doc]))
-                    print("\n\n")
+                for doc_path, doc_results in results.items():
+                    outfile.write(txt_out(doc_results))
+    else:
+        if args.format == 'json':
+            print(json.dumps(keys_string(results), cls=BytesDump, sort_keys=True, indent=4))
+        else:
+            for doc_path, doc_results in results.items():
+                print(txt_out(doc_results))
+                print("\n\n")
+
+
+def main(args=None) -> argparse.Namespace:
+    """QuickSand CLI main function.
+    
+    Args:
+        args: Command-line arguments (if None, sys.argv is used)
+        
+    Returns:
+        Parsed argument namespace
+    """
+    parser = argparse.ArgumentParser(
+        description='QuickSand Document and PDF malware analysis tool.'
+    )
+    parser.add_argument(
+        'document', 
+        type=str, 
+        help='document or directory to scan'
+    )
+    parser.add_argument(
+        "-v", "--verbose", 
+        help="increase output verbosity",
+        action="store_true"
+    )
+    parser.add_argument(
+        "-c", "--capture", 
+        help="capture stream content",
+        action="store_true"
+    )
+    parser.add_argument(
+        "-y", "--yara", 
+        help="capture yara matched strings",
+        action="store_true"
+    )
+    parser.add_argument(
+        "-t", "--timeout", 
+        help="timeout in seconds", 
+        default=0,
+        type=int
+    )
+    parser.add_argument(
+        "-e", "--exploit", 
+        help="yara exploit signatures", 
+        default=None, 
+        type=str
+    )
+    parser.add_argument(
+        "-x", "--exe", 
+        help="yara executable signatures", 
+        default=None, 
+        type=str
+    )
+    parser.add_argument(
+        "-a", "--pdf", 
+        help="yara PDF signatures", 
+        default=None, 
+        type=str
+    )
+    parser.add_argument(
+        "-f", "--format", 
+        help="output format", 
+        type=str,
+        choices=['json', 'txt'], 
+        default='json'
+    )
+    parser.add_argument(
+        "-o", "--out", 
+        help="save output to this filename", 
+        default=None, 
+        type=str
+    )
+    parser.add_argument(
+        "-p", "--password", 
+        help="password to decrypt ole or pdf", 
+        default=None, 
+        type=str
+    )
+    parser.add_argument(
+        "-d", "--dropdir", 
+        help="save objects to this directory", 
+        default=None, 
+        type=str
+    )
+ 
+    args = parser.parse_args(args)
+    
+    # Automatically enable capture mode if dropdir is specified
+    if args.dropdir:
+        args.capture = True
+
+    # Process the input based on whether it's a file or directory
+    input_path = Path(args.document)
+    if input_path.is_file():
+        process_file(str(input_path), args)
+    elif input_path.is_dir():
+        process_directory(str(input_path), args)
+    else:
+        print(f"Error: '{args.document}' is not a valid file or directory")
+        sys.exit(1)
 
     return args
         
+
 if __name__ == "__main__":
     main()

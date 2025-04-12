@@ -2166,18 +2166,18 @@ rule suspicious_embedded_OLE_document_header {
 	condition: $h_reg1 at 0
 }
 
-rule suspicious_embedded_external_content {
+rule suspicious_embedded_external_link {
 	meta:
 		is_exploit = false
-		is_warning = true
-		is_feature = false
-		rank = 1
-		revision = "1"
-		date = "June 07 2020"
+		is_warning = false
+		is_feature = true
+		rank = 0
+		revision = "2"
+		date = "April 11 2025"
 		author = "@tylabs"
 		sigtype = "pdfexaminer_obfuscation"
-		copyright = "Copyright 2020 tylabs.com. All rights reserved."
-		desc = "suspicious.embedded external content"
+		copyright = "Copyright 2025 tylabs.com. All rights reserved."
+		desc = "information.external link"
 		mitre = "T1566.002"
 	strings:
 		$h_raw1 = "/S /URI" nocase

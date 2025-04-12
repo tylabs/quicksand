@@ -38,7 +38,7 @@ A hosted version is available to try without any installation at [scan.tylabs.co
 
 - olefile
 
-- yara-python
+- yara-python (version 4.3.0 or higher required)
 
 - yara
 

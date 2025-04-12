@@ -12,38 +12,6 @@ import hashlib
 import config
 
 
-def keys_string(d):
-    #print(d)
-    rval = {}
-    if not isinstance(d, dict):
-        if isinstance(d,(tuple,list,set)):
-            v = [keys_string(x) for x in d]
-            return v
-        elif isinstance(d,bytes):
-           try: 
-                return d.decode("utf-8")
-           except:
-                return d.hex()
-        else:
-            try: 
-                return d.decode("utf-8")
-            except:
-                return d
-    keys = list(d.keys())
-    for k in keys:
-        v = d[k]
-        if isinstance(k,bytes):
-            try:
-                k = k.decode("utf-8")
-            except:
-                k = k.hex()
-        if isinstance(v,dict):
-            v = keys_string(v)
-        elif isinstance(v,(tuple,list,set)):
-            v = [keys_string(x) for x in v]
-        rval[k] = v
-    return rval
-
 # The print statements are saved in the AWS lambda function logs
 
 def getFile(uuid):
@@ -82,6 +50,41 @@ def getReport(hash):
     print(str(time.time()) + " got report")
     return data
 
+def keys_string(data):
+    new_data = {}
+    for key, value in data.items():
+        if isinstance(value, list):
+            new_list = []
+            for item in value:
+                if isinstance(item, dict):
+                    new_dict = {}
+                    for k, v in item.items():
+                        if isinstance(v, list):
+                            new_v_list = []
+                            for elem in v:
+                                # Check if elem is a StringMatch object and convert
+                                if hasattr(elem, '__str__'):
+                                    new_v_list.append(str(elem))
+                                else:
+                                    new_v_list.append(elem)
+                            new_dict[k] = new_v_list
+                        elif hasattr(v, '__str__'):
+                            new_dict[k] = str(v)
+                        else:
+                            new_dict[k] = v
+                    new_list.append(new_dict)
+                elif hasattr(item, '__str__'):
+                    new_list.append(str(item))
+                else:
+                    new_list.append(item)
+            new_data[key] = new_list
+        elif isinstance(value, dict):
+            new_data[key] = keys_string(value)  # Recursively process nested dictionaries
+        elif hasattr(value, '__str__'):
+            new_data[key] = str(value)
+        else:
+            new_data[key] = value
+    return new_data
 
 def lambda_handler(event, context):
 
@@ -136,7 +139,8 @@ def lambda_handler(event, context):
 
             qs.results['filename'] = filename
             qs.results['uuid'] = uuid
-            rt = json.dumps(keys_string(qs.results))
+            #print(qs.results)
+            rt = json.dumps(qs.results)
             print(str(time.time()) + " qs end convert")
 
             cacheReport(qs.results['md5'], rt)
