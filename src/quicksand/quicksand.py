@@ -1082,7 +1082,7 @@ class quicksand:
             self.results['risk'] = "risk of exploit"
             self.results['rating'] = 2
             
-        if self.results['exploit'] >= 3:
+        if self.results['exploit'] >= 1:
             self.results['risk'] = "high risk of exploit"
             self.results['rating'] = 3
             
