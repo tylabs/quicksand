@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QuickSand Document Analysis</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.8em;
+            color: #666;
+        }
+        .upload-btn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .upload-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+    <!-- Environment Configuration -->
+    <script>
+        // These variables can be overridden by setting them before loading quicksand.js
+        window.QUICKSAND_API_BASE_URL = window.QUICKSAND_API_BASE_URL || 'https://api.tylabs.com';
+        window.QUICKSAND_SCAN_BASE_URL = window.QUICKSAND_SCAN_BASE_URL || 'https://scan.tylabs.com';
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>QuickSand Document Analysis</h1>
+        <form id="uploadForm" onsubmit="event.preventDefault(); getSignature();">
+            <input type="file" id="file" name="file">
+            <br>
+            <input type="submit" value="Analyze" class="upload-btn">
+        </form>
+        <div id="qserror"></div>
+        <div id="text"></div>
+    </div>
+    <div class="footer">
+        <p>QuickSand Document Analysis Service</p>
+        <p>Copyright (c) 2025 <a href="https://tylabs.com">@tylabs</a></p>
+    </div>
+    <script src="js/gauge.min.js"></script>
+    <script src="js/quicksand.js"></script>
+</body>
+</html>

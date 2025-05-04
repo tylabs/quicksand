@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QuickSand API Documentation</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            text-align: left;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .note {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.8em;
+            color: #666;
+        }
+    </style>
+    <!-- Environment Configuration -->
+    <script>
+        // These variables can be overridden by setting them before loading quicksand.js
+        window.QUICKSAND_API_BASE_URL = window.QUICKSAND_API_BASE_URL || 'https://api.tylabs.com';
+        window.QUICKSAND_SCAN_BASE_URL = window.QUICKSAND_SCAN_BASE_URL || 'https://scan.tylabs.com';
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>QuickSand API Documentation</h1>
+        </div>
+
+        <div class="content">
+            <div class="note">
+                <strong>Note:</strong> Please rate limit requests as heavy users may be blocked. Limit file sizes to 20MB max for documents, 10MB for PDFs.
+            </div>
+
+            <h2>Configuration</h2>
+            <p>The QuickSand API is available at a configurable base URL. By default, it's set to:</p>
+            <pre><code>API_BASE_URL = 'https://api.tylabs.com'</code></pre>
+            <p>You can override this by setting the environment variable <code>QUICKSAND_API_BASE_URL</code>.</p>
+
+            <h2>Pre-signed Upload URL</h2>
+            <p>Get a pre-signed URL for file upload:</p>
+            <pre><code>GET <span id="upload-url">${API_BASE_URL}/upload</span>?filename=<filename></code></pre>
+            <p>Parameters:</p>
+            <ul>
+                <li><code>filename</code>: The basename of the file to upload</li>
+            </ul>
+            <p>Response includes:</p>
+            <ul>
+                <li><code>upload_url</code>: The pre-signed URL for uploading</li>
+                <li><code>meta</code>: Metadata including UUID and required headers</li>
+            </ul>
+
+            <h2>Upload File</h2>
+            <p>Upload the file using the pre-signed URL:</p>
+            <pre><code>PUT <upload_url></code></pre>
+            <p>Required headers:</p>
+            <ul>
+                <li><code>x-goog-meta-ip</code>: Submitter's IP address</li>
+                <li><code>x-goog-meta-original-filename</code>: Original filename</li>
+            </ul>
+
+            <h2>Get Analysis Results</h2>
+            <p>Retrieve analysis results:</p>
+            <pre><code>GET <span id="analyze-url">${API_BASE_URL}/analyze</span>?uuid=<uuid>&rerun=1</code></pre>
+            <p>Parameters:</p>
+            <ul>
+                <li><code>uuid</code>: The UUID returned from the upload process</li>
+                <li><code>rerun</code>: (Optional) Set to 1 to force reanalysis</li>
+            </ul>
+
+            <h2>Search by Hash</h2>
+            <p>Search for previous analysis results:</p>
+            <pre><code>GET <span id="search-url">${API_BASE_URL}/search</span>?query=<md5></code></pre>
+            <p>Parameters:</p>
+            <ul>
+                <li><code>query</code>: MD5 hash of the file to search for</li>
+            </ul>
+
+            <h2>Python 3 Example</h2>
+            <pre><code>import requests
+import json
+import os
+import urllib.parse
+import pprint
+
+# Configure API base URL
+API_BASE_URL = os.getenv('QUICKSAND_API_BASE_URL', 'https://api.tylabs.com')
+
+def submit_file(filename):
+    # Get pre-signed URL
+    params = {'filename': os.path.basename(filename)}
+    response = requests.get(f"{API_BASE_URL}/upload", params=params)
+    signature = response.json()
+    
+    # Upload file
+    headers = {
+        'x-goog-meta-ip': signature['meta']['submitter_ip'],
+        'x-goog-meta-original-filename': signature['meta']['original_filename']
+    }
+    
+    with open(filename, 'rb') as f:
+        upload_response = requests.put(
+            signature['upload_url'],
+            headers=headers,
+            data=f
+        )
+    
+    # Get analysis results
+    result_params = {'uuid': signature['meta']['uuid']}
+    result_response = requests.get(f"{API_BASE_URL}/analyze", params=result_params)
+    
+    return result_response.json()
+
+# Example usage
+result = submit_file("sample.pdf")
+pprint.pprint(result)</code></pre>
+        </div>
+
+        <div class="footer">
+            <p>QuickSand - Document Analysis Tool</p>
+            <p>Copyright (c) 2024 <a href="https://tylabs.com">@tylabs</a></p>
+        </div>
+    </div>
+    <script>
+        // Update URLs in the documentation
+        document.getElementById('upload-url').textContent = `${window.QUICKSAND_API_BASE_URL}/upload`;
+        document.getElementById('analyze-url').textContent = `${window.QUICKSAND_API_BASE_URL}/analyze`;
+        document.getElementById('search-url').textContent = `${window.QUICKSAND_API_BASE_URL}/search`;
+    </script>
+</body>
+</html>

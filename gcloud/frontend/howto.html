@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QuickSand How To Guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            text-align: left;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.8em;
+            color: #666;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #444;
+            margin-top: 25px;
+        }
+        h4 {
+            color: #555;
+            margin-top: 20px;
+        }
+        p {
+            margin: 10px 0;
+        }
+        ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        .section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .section h3 {
+            margin-top: 0;
+        }
+        .section ul {
+            margin: 10px 0;
+        }
+        .section li {
+            margin: 5px 0;
+        }
+        code {
+            font-family: monospace;
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>QuickSand How To Guide</h1>
+        </div>
+
+        <div class="section">
+            <h2>Usage</h2>
+            <p>QuickSand can accept most common office documents and PDFs.</p>
+        </div>
+
+        <div class="section">
+            <h2>Get Started</h2>
+            <p>On <a href="https://scan.tylabs.com">scan.tylabs.com</a> click the <code>Choose File</code> button under the logo on the left, then select the file to scan. Click <code>Scan Document or PDF</code> to start the analysis. Javascript is required to upload the file.</p>
+        </div>
+
+        <div class="section">
+            <h2>Limits</h2>
+            <ul>
+                <li><strong>Filesize:</strong> 20MB for documents, 10MB for PDFs. Documents over 20MB (max 60s of processing) or PDFs over 10MB (max 60s of processing) may timeout on the online version of <a href="https://scan.tylabs.com">QuickSand</a>. The timeout field is configurable on the software version of QuickSand.</li>
+                <li><strong>Filetypes:</strong> Links, executables won't be accessed/decoded.</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>How to interpret the results</h2>
+            
+            <h3>Metadata</h3>
+            <p>This section has information about the file itself. Hashes that can be used to uniquely identify the file etc.</p>
+            <ul>
+                <li><strong>filetype:</strong> ole, mso, pdf, openxml etc. The type of file. "data" means the format is not known and sub-streams will not be extracted.</li>
+                <li><strong>md5:</strong> hash to relatively uniquely identify the file</li>
+                <li><strong>sha1, sha256, sha512:</strong> longer more unique hashes to identify the file</li>
+                <li><strong>size:</strong> file size in bytes</li>
+                <li><strong>started:</strong> epoch time in seconds that the processing started</li>
+                <li><strong>finished:</strong> epoch time in seconds that the processing finished</li>
+                <li><strong>elapsed:</strong> total running time (finished-started)</li>
+            </ul>
+
+            <h3>Similarity</h3>
+            <p>Similarity between documents can be an important tool to map attacks by the same actors or exploit kit.</p>
+            <ul>
+                <li><strong>structhash:</strong> a unique 32 byte hash of a concatenated list of structural elements such as PDF objects or ole streams.</li>
+                <li><strong>struzzy:</strong> A fuzzy hash for calculating Levenshtein distance between two document structures. Each structural element is represented by an alphanumeric code. More complex documents will have a longer string. Layout of this hash is a number followed by a string. (Element Total: Fuzzy hash).</li>
+            </ul>
+
+            <h3>Results</h3>
+            <ul>
+                <li><strong>risk:</strong> plain language risk assessment: active content or exploit</li>
+                <li><strong>score:</strong> generally one point for obfuscation method/active content and 10 for an exploit based on the "rank" metadata field in our Yara rules.</li>
+            </ul>
+
+            <h3>Detailed Results</h3>
+            <p>This section is a list of objects or streams and exploits detected within.</p>
+            <ul>
+                <li><strong>Yara rule:</strong> Name of rule that was detected</li>
+                <li><strong>description:</strong> Description of what the rule detected. (CVE or active content etc).</li>
+                <li><strong>strings:</strong> location offset within the stream, yara variable name: string content.</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>JSON Report Structure</h2>
+            <p>The json report contains the following structure:</p>
+            <ul>
+                <li><strong>results</strong>
+                    <ul>
+                        <li>stream name: rule name, desc, strings: [list], type, mitre</li>
+                    </ul>
+                </li>
+                <li><strong>score</strong></li>
+                <li><strong>warning</strong></li>
+                <li><strong>exploit</strong></li>
+                <li><strong>execute</strong></li>
+                <li><strong>feature</strong></li>
+                <li><strong>filename</strong></li>
+                <li><strong>md5</strong></li>
+                <li><strong>sha1</strong></li>
+                <li><strong>sha256</strong></li>
+                <li><strong>sha512</strong></li>
+                <li><strong>size</strong></li>
+                <li><strong>started</strong></li>
+                <li><strong>finished</strong></li>
+                <li><strong>version</strong></li>
+                <li><strong>quicksand_pdf.yara: epoch</strong></li>
+                <li><strong>quicksand_exe.yara: epoch</strong></li>
+                <li><strong>quicksand_exploit.yara: epoch</strong></li>
+                <li><strong>header: hex 10 bytes</strong></li>
+                <li><strong>type</strong></li>
+                <li><strong>ole metadata</strong>
+                    <ul>
+                        <li>ole_author</li>
+                        <li>ole_company</li>
+                        <li>ole_last_saved_by</li>
+                        <li>ole_title</li>
+                        <li>ole_create_time</li>
+                        <li>ole_last_saved_time</li>
+                    </ul>
+                </li>
+                <li><strong>risk</strong></li>
+                <li><strong>rating:</strong> 0 = clean, 1=active content, 2=high score active content, 3=exploit</li>
+                <li><strong>structhash</strong></li>
+                <li><strong>structure: string</strong></li>
+                <li><strong>structhash_version</strong></li>
+                <li><strong>structhash_elements: int</strong></li>
+                <li><strong>struzzy</strong></li>
+                <li><strong>elapsed</strong></li>
+                <li><strong>version:</strong> tool version id</li>
+                <li><strong>uuid</strong> (internal scan id)</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>References</h2>
+            <ul>
+                <li><a href="https://cve.mitre.org/cve/search_cve_list.html">Mitre CVE Reference</a></li>
+                <li><a href="https://attack.mitre.org">Mitre Att&ck Reference</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>QuickSand Document Analysis Service</p>
+        <p>Copyright (c) 2025 <a href="https://tylabs.com">@tylabs</a></p>
+    </div>
+</body>
+</html>
+

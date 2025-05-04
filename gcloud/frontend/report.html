@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QuickSand Analysis Report</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            text-align: left;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.8em;
+            color: #666;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        #text {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        #qsreport {
+            margin: 20px 0;
+        }
+        #qsreport h2 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 30px;
+        }
+        #qsreport h3 {
+            color: #444;
+            margin-top: 25px;
+        }
+        #qsreport h4 {
+            color: #555;
+            margin-top: 20px;
+        }
+        #qsreport p {
+            margin: 10px 0;
+        }
+        #qsreport ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        #qsreport li {
+            margin: 5px 0;
+        }
+        .mitre {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        #risk {
+            margin: 20px auto;
+            display: block;
+        }
+        .metadata {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .metadata p {
+            margin: 5px 0;
+        }
+        .result {
+            background: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .strings {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .strings small {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>QuickSand Analysis Report</h1>
+        </div>
+        <div id="text"></div>
+        <div id="qsreport"></div>
+    </div>
+    <div class="footer">
+        <p>QuickSand Document Analysis Service</p>
+        <p>Copyright (c) 2025 <a href="https://tylabs.com">@tylabs</a></p>
+    </div>
+    <script src="js/gauge.min.js"></script>
+    <script src="js/quicksand.js"></script>
+<script>
+        window.onload = function() {
+            var uuid = get('uuid');
+            if (!uuid || uuid === 'undefined') {
+                document.getElementById("text").innerHTML = "<font color=red>Error: No analysis ID provided</font>";
+                return;
+            }
+            process();
+        };
+</script>
+</body>
+</html>
+

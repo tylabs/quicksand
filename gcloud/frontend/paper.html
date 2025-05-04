@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QuickSand White Paper</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #333;
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #444;
+            margin-top: 25px;
+        }
+        p {
+            margin: 15px 0;
+        }
+        ul {
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .feature-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .feature-list li {
+            margin: 15px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        .feature-list li:before {
+            content: "•";
+            color: #007bff;
+            position: absolute;
+            left: 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>QuickSand White Paper</h1>
+        </div>
+
+        <div class="content">
+            <h2>The QuickSand Framework</h2>
+            <p>QuickSand is a Python Module and command line tool that decodes and decompresses streams within Office Documents or PDF files. Once streams are decoded, it uses Yara to scan for exploits and executables. We provide signatures for document exploits, PDF Exploits and executables through an annual maintenance subscription.</p>
+
+            <h2>Active Content Detection</h2>
+            <p>QuickSand detects active content that could be used to access information from your computer or download malicious content.</p>
+            <p>Detect:</p>
+            <ul>
+                <li>Javascript</li>
+                <li>Flash</li>
+                <li>Visual Basic</li>
+                <li>ActiveX</li>
+                <li>Macros</li>
+                <li>Shell commands</li>
+                <li>Remotely included templates</li>
+            </ul>
+
+            <h2>Exploit Detection</h2>
+            <p>QuickSand detects known exploits and the active content used to setup memory for exploitation. Identified by CVE, knowing which exploit your malicious document contains can be useful to know what version of Office or PDF Reader is needed to run the exploit in a Sandbox.</p>
+
+            <h2>Document Similarity Analysis</h2>
+            <p>Our similarity hashes can help link attacks to actors and exploit kits.</p>
+            <ul>
+                <li>A hash <code>structhash</code> can link similar documents created with the same tool.</li>
+                <li>The <code>struzzy</code> fuzzy structural hash can be used to calculate a <a href="https://en.wikipedia.org/wiki/Levenshtein_distance" target="_blank">Levenshtein distance</a> between documents. Small distances can indicate an extra exploit or payload was added or removed.</li>
+            </ul>
+
+            <h2>MITRE ATT&CK Integration</h2>
+            <p>The MITRE ATT&CK Techniques can be used to define the Tactics, Techniques, and Procedures (TTPs) used by threat actors.</p>
+
+            <h2>Integration Capabilities</h2>
+            <h3>Analyst Tools</h3>
+            <ul class="feature-list">
+                <li>Investigate reports of suspicious activity</li>
+                <li>Breach investigations - mass scan/triage files for exploits</li>
+                <li>Threat intelligence link analysis</li>
+                <li>Pre-process to select the correct sandbox</li>
+            </ul>
+
+            <h3>Detection Systems</h3>
+            <ul class="feature-list">
+                <li>Mail wrap tool to return results like an external AV</li>
+                <li>In-line delivery - block high risk content</li>
+            </ul>
+
+            <h3>Public-Facing Integrations</h3>
+            <ul class="feature-list">
+                <li>Accepting document format files from the public</li>
+                <li>Web service integration</li>
+                <li>HR system integration</li>
+                <li>Extra scan layer to find things commercial AV may miss</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>QuickSand - Document Analysis Tool</p>
+        </div>
+    </div>
+</body>
+</html>
+
+
+

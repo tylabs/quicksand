@@ -14,8 +14,6 @@ docker run -d quicksand
 docker cp <docker_id>:/quicksand/dependencies.zip .
 ```
 
-wait.py: Simple python script that the Dockerfile runs to keep the Docker image running to allow access to copy out the dependencies.zip.
-
 
 ## Lambda functions
 
