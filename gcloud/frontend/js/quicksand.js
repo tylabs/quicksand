@@ -55,7 +55,7 @@ function baseName(base)
 
 
 function doReport(r) {
-	var out = "<H2>Metadata</H2>";
+	var out = "<H3>Metadata</H3>";
 	out += "<p>";
 	if (typeof r['filename'] != "undefined") {
 		out += "filename:&nbsp;" + baseName(r['filename'].replace(/(<([^>]+)>)/ig,"")) + "<br>";
