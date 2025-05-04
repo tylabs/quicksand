@@ -9,6 +9,7 @@ const CONFIG = {
 	API_BASE_URL: window.QUICKSAND_API_BASE_URL || 'https://api.tylabs.com',
 	SCAN_BASE_URL: window.QUICKSAND_SCAN_BASE_URL || 'https://scan.tylabs.com',
 	HOWTO_URL: 'howto',
+	REPORT_URL: 'report',
 	MAX_FILE_SIZE: 20971520, // 20MB in bytes
 	MITRE_JSON_PATH: './assets/json/mitre.json'
 };
@@ -333,7 +334,7 @@ function getSignature() {
 								}
 								
 								// Redirect to report.html with the uuid
-								window.location.href = "report.html?uuid=" + uuid;
+								window.location.href = CONFIG.REPORT_URL + "?uuid=" + uuid;
 							} else {
 								console.error("Upload failed with status:", this.status);
 								console.error("Response:", this.responseText);
