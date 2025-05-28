@@ -213,7 +213,49 @@ rule executable_macosx {
             1 of them
 }
 
+rule executable_unhandled_compression {
+	meta:
+		is_exe = true
+		revision = "1"
+		rank = 2
+		type = "compression"
+		date = "May 28 2025"
+		author = "@tylabs"
+		copyright = "tylabs.com 2025"
+		desc = "compression script"
+		mitre = "T1027.015"
 
-
-
-
+	 strings:
+	    // .7z (7-Zip)
+	    $7z_magic = { 37 7A BC AF 27 1C }
+	
+	    // .tar (Tape Archive) - Often starts with a specific header, but can be less reliable than others.
+	    // This is a common pattern for the 'ustar' header.
+	    $tar_magic = { 75 73 74 61 72 00 30 30 } // "ustar\000"
+	
+	    // .rar (RAR archive)
+	    $rar_magic_v1 = { 52 61 72 21 1A 07 00 } // RAR 1.50 onwards
+	    $rar_magic_v2 = { 52 61 72 21 1A 07 01 00 } // RAR 5.00 onwards
+	
+	    // .gz / .gzip (GNU Zip)
+	    $gz_magic = { 1F 8B }
+	
+	    // .bzip2 (BZip2)
+	    $bzip2_magic = { 42 5A 68 } // "BZh"
+	
+	    // .wim (Windows Imaging Format)
+	    $wim_magic = { 4D 53 57 49 4D } // "MSWIM"
+	
+	    // .xz (XZ Utils)
+	    $xz_magic = { FD 37 7A 58 5A 00 }
+	
+	  condition:
+	    $7z_magic at 0 or
+	    $tar_magic at 0 or
+	    $rar_magic_v1 at 0 or
+	    $rar_magic_v2 at 0 or
+	    $gz_magic at 0 or
+	    $bzip2_magic at 0 or
+	    $wim_magic at 0 or
+	    $xz_magic at 0
+}
