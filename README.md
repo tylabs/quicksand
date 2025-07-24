@@ -1,3 +1,35 @@
+
+<div align="right">
+  <details>
+    <summary >🌐 Language</summary>
+    <div>
+      <div align="center">
+        <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=en">English</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=zh-CN">简体中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=zh-TW">繁體中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=ja">日本語</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=ko">한국어</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=hi">हिन्दी</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=th">ไทย</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=fr">Français</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=de">Deutsch</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=es">Español</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=it">Italiano</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=ru">Русский</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=pt">Português</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=nl">Nederlands</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=pl">Polski</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=ar">العربية</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=fa">فارسی</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=tr">Türkçe</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=vi">Tiếng Việt</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=id">Bahasa Indonesia</a>
+        | <a href="https://openaitx.github.io/view.html?user=tylabs&project=quicksand&lang=as">অসমীয়া</
+      </div>
+    </div>
+  </details>
+</div>
+
 # QuickSand Version 2
 
 QuickSand Python Package and Command Line Tool
