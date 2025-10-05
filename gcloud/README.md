@@ -81,19 +81,34 @@ Create this cors.json:
       "https://*.<website hosting front end>"
     ],
     "method": ["GET", "PUT", "POST", "DELETE", "OPTIONS"],
-    "responseHeader": [
-      "Content-Type",
-      "Access-Control-Allow-Origin",
-      "Access-Control-Allow-Methods",
-      "Access-Control-Allow-Headers",
-      "x-goog-meta-ip",
-      "x-goog-meta-original-filename"
-    ],
+    "responseHeader": ["*"]
     "maxAgeSeconds": 3600
   }
 ]
 ```
+or more detailed settings:
 
+```
+[
+  {
+    "origin": [
+      "https://<website hosting front end>",
+      "https://*.<website hosting front end>"
+    ],
+    "method": ["GET", "PUT", "POST", "DELETE", "OPTIONS"],
+    "responseHeader": [
+      "x-goog-meta-ip",
+      "x-goog-meta-original-filename",
+      "Content-Type",
+      "Content-Length",
+      "ETag",
+      "x-goog-generation",
+      "x-goog-metageneration"
+  ],
+    "maxAgeSeconds": 3600
+  }
+]
+```
 GCP Console run:
 `gsutil cors set cors.json gs://<bucket_name>`
 
