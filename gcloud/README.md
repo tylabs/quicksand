@@ -78,7 +78,7 @@ Create this cors.json:
   {
     "origin": [
       "https://<website hosting front end>",
-      "https://*.<website hosting front end>m"
+      "https://*.<website hosting front end>"
     ],
     "method": ["GET", "PUT", "POST", "DELETE", "OPTIONS"],
     "responseHeader": [
