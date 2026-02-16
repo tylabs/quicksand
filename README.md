@@ -23,7 +23,7 @@ A hosted version is available to try without any installation at [scan.tylabs.co
 
 - requirements.txt: Python dependencies
 
-  [gcloud/](lambda/README.md) Optional Google Cloud Run functions
+  [gcloud/](gcloud/README.md) Optional Google Cloud Run functions
 
 - [lambda/](lambda/README.md) Optional AWS Lambda functions
 
