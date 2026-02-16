@@ -21,7 +21,9 @@ A hosted version is available to try without any installation at [scan.tylabs.co
 
 - bin/quicksand: Command line tool.
 
-- requirements.txt: Python dependencies 
+- requirements.txt: Python dependencies
+
+  [gcloud/](lambda/README.md) Optional Google Cloud Run functions
 
 - [lambda/](lambda/README.md) Optional AWS Lambda functions
 
@@ -168,7 +170,7 @@ Returns a dictionary of {filename: `qs_results`,...}.
 
 Documents are scored based on the rank value in the associated Yara signature metadata. 
 
-Additionally, each signature defines whether the detected item is an exploit, a warning or a risky feature. For more information on how to interpret the results, please see [https://scan.tylabs.com/howto](https:/scan.tylabs.com/howto) .
+Additionally, each signature defines whether the detected item is an exploit, a warning or a risky feature. For more information on how to interpret the results, please see [scan.tylabs.com/howto](https:/scan.tylabs.com/howto) .
 
 If you add your own signatures, they don't need to include the extra metadata to function.
 
