@@ -43,7 +43,7 @@ from typing import Dict, List, Optional, Union, Tuple, Any, BinaryIO
 
 
 class quicksand:
-    __version__ = '2.1.2'
+    __version__ = '2.1.3'
     __author__ = "tylabs.com"
     __copyright__ = "Copyright 2025, @tylabs"
     __license__ = "MIT"

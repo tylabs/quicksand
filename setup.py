@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="quicksand",
-    version="2.1.2",
+    version="2.1.3",
     author="tylabs.com",
     author_email="nospam@tylabs.com",
     description="QuickSand is a module to scan streams inside documents with Yara",
