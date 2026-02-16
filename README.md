@@ -170,7 +170,7 @@ Returns a dictionary of {filename: `qs_results`,...}.
 
 Documents are scored based on the rank value in the associated Yara signature metadata. 
 
-Additionally, each signature defines whether the detected item is an exploit, a warning or a risky feature. For more information on how to interpret the results, please see [quick start guide](https:/scan.tylabs.com/howto).
+Additionally, each signature defines whether the detected item is an exploit, a warning or a risky feature. For more information on how to interpret the results, please see [quick start guide](https:/scan.tylabs.com/howto/).
 
 If you add your own signatures, they don't need to include the extra metadata to function.
 
