@@ -14,9 +14,9 @@ import re
 from pathlib import Path
 from typing import Dict, Any, List, Union, Optional
 
-__version__ = '2.1.2'
+__version__ = '2.1.4'
 __author__ = "Tyler McLellan"
-__copyright__ = "Copyright 2025, @tylabs"
+__copyright__ = "Copyright 2026, @tylabs"
 __license__ = "MIT"
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 ###
-### QuickSand 2: Python3 Version Copyright (c) 2025 @tylabs
+### QuickSand 2: Python3 Version Copyright (c) 2026 @tylabs
 ### https://github.com/tylabs/quicksand
 ###
 ### Python3 module and executable to process suspected document or PDF malware for exploit detection
@@ -43,9 +43,9 @@ from typing import Dict, List, Optional, Union, Tuple, Any, BinaryIO
 
 
 class quicksand:
-    __version__ = '2.1.3'
+    __version__ = '2.1.4'
     __author__ = "tylabs.com"
-    __copyright__ = "Copyright 2025, @tylabs"
+    __copyright__ = "Copyright 2026, @tylabs"
     __license__ = "MIT"
     
     try:

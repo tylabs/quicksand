@@ -2250,3 +2250,40 @@ rule pdf_exploit_CVE_2023_21608 {
 
 	condition: 3 of them
 }
+
+
+rule pdf_exploit_JSF_obfuscated_payload {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 5
+		revision = "1"
+		date = "April 11 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_obfuscation"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit JSF Obfuscated payload"
+		mitre = "T1027 T1059.007"
+		url = "https://justhaifei1.blogspot.com/2026/04/expmon-detected-sophisticated-zero-day-adobe-reader.html"
+	strings:
+        	// Detects the [object Object] extraction: ({}+[])[[+!+[]]+[+!+[]]]
+        	$obj_extraction = /\{\}\+\[\]/ 
+
+        	// Detects the common "NaN" or "Infinity" trick: (+{}+[]) or (!+[]/+[]+[])
+        	$nan_inf_trick = /\(\+?\{\}\+\[\]\)/
+        	$div_zero_trick = /\(!\+\[\]\/\+\[\]\+\[\]\)/
+
+        	// Detects the repeated index building: [+!+[]]+[+!+[]]
+        	$index_builder = /\[\+!\+\[\]\]\+\[\+!\+\[\]\]/
+
+        	// Acrobat specific suspicious calls often found with this
+        	$getField_val = /getField\(.*\)\.["']v["']\s*\+\s*.*\s*\+\s*["']ue["']/i
+        	$setTimeout_obf = /"s"\s*\+\s*.*\s*\+\s*"tTim"/i
+        	$soap_obf = /SOAP\["stre"/i
+
+    condition:
+            2 of ($obj_extraction, $nan_inf_trick, $div_zero_trick, $index_builder) or
+            any of ($getField_val, $setTimeout_obf, $soap_obf)
+
+}
