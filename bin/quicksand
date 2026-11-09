@@ -6,6 +6,13 @@ This script provides a command-line interface to the QuickSand library,
 allowing users to analyze documents for potential malware and exploits.
 """
 
+from pathlib import Path
+import sys
+
+_local_src = Path(__file__).resolve().parent.parent / "src"
+if (_local_src / "quicksand").is_dir():
+    sys.path.insert(0, str(_local_src))
+
 from quicksand import (
     BytesDump,
     keys_string,

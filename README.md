@@ -1,4 +1,4 @@
-# QuickSand Version 2.2
+# QuickSand Version 2.3
 
 **QuickSand Python Package and Command-Line Tool**
 
@@ -12,15 +12,15 @@ A hosted version is available to try without any installation at [scan.tylabs.co
 
 ## Supported Formats & Capabilities
 
-- **OLE2 Compound Files (`[MS-CFB]`)**: Native parsing of `.doc`, `.xls`, `.ppt`, `.msg`, and HWP documents, including FAT/DIFAT/MiniFAT stream extraction and `[MS-OLEPS]` `SummaryInformation` / `DocumentSummaryInformation` metadata extraction.
+- **OLE2 Compound Files (`[MS-CFB]`)**: Native parsing of `.doc`, `.xls`, `.ppt`, `.msg`, and HWP documents, including FAT/DIFAT/MiniFAT stream extraction, `[MS-OLEPS]` `SummaryInformation` / `DocumentSummaryInformation` metadata extraction, and `[MS-OXRTFCP]` Outlook MAPI Compressed RTF (`LZFu` / `MELA`) decompression.
 - **VBA Macros (`[MS-OVBA]`)**: Native decompression of compressed VBA macro streams (`Macros`, `_VBA_PROJECT_CUR`, `VBA`) while also scanning raw streams to catch VBA stomping / p-code tampering.
 - **Excel 4.0 (XLM) Macros (`[MS-XLS]`)**: Native BIFF5/BIFF8 scanner for `BOUNDSHEET` macro sheets, `Auto_Open` / `Auto_Close` built-in labels, `FORMULA` tokens (`EXEC`, `CALL`, `REGISTER`, `CHAR`, `GET.WORKSPACE`), `SST`, and `DCONN` data connections.
 - **Encrypted Office Documents (`[MS-OFFCRYPTO]`)**: Built-in detection and in-memory decryption of ECMA-376 Standard Encryption (AES-128/192/256 & CryptoAPI RC4) and Agile Encryption (XML v4.4) using user-supplied passwords and common malware passwords (such as `VelvetSweatshop`).
-- **Rich Text Format (RTF)**: Native extraction of `\objdata`, `ods`, and `datastore` hex streams, OLE 1.0 objects (e.g., Equation Editor `Equation.3`), and `OLEPackage` embedded files (with resilience against RTF control-word obfuscation).
-- **PDF Documents**: Native stream parser and filter pipeline supporting `/FlateDecode` (including PNG row predictors 10–15), `/ASCIIHexDecode`, `/ASCII85Decode`, `/LZWDecode`, `/RunLengthDecode`, `#xx` hex-escaped filter names, and PDF 1.5+ `/ObjStm` compressed object streams.
-- **OpenXML / ZIP Containers**: Extraction and recursive analysis of `.docx`, `.xlsx`, `.pptx`, and embedded archives, relationships (`oleObject`, `aFChunk`, external templates), and ActiveX controls.
+- **Rich Text Format (RTF)**: Native extraction of `\objdata`, `ods`, and `datastore` hex streams, OLE 1.0 objects (e.g., Equation Editor `Equation.3`), trailing `\objdata` presentation streams (`CVE-2025-21298`), and `OLEPackage` embedded files (with resilience against RTF control-word obfuscation).
+- **PDF Documents**: Native stream parser and filter pipeline supporting `/FlateDecode` (including PNG row predictors 10–15), `/ASCIIHexDecode`, `/ASCII85Decode`, `/LZWDecode`, `/RunLengthDecode`, `#xx` hex-escaped dictionary/filter names, `/EmbeddedFile` recursive scanning, Widget `/V` Base64 payload decoding (`CVE-2026-34621`), and PDF 1.5+ `/ObjStm` compressed object streams.
+- **OpenXML / ZIP / Archive Containers**: Extraction and recursive analysis of `.docx`, `.xlsx`, `.pptx`, embedded archives, ZIP entry filename manifests (`CVE-2023-38831`, `CVE-2025-59689`), WinRAR ADS path traversal (`CVE-2025-8088`), relationships (`oleObject`, `aFChunk`, external templates), and ActiveX controls.
 - **MIME / MHT / ActiveMime / WordML (`mso`)**: Base64 decoding and zlib inflation of `ActiveMime` headers and embedded payloads.
-- **PostScript (`ps`) & OneNote (`.one`)**: Hex payload extraction and embedded script/executable detection.
+- **PostScript (`ps`), OneNote (`.one`), Flash (`CWS`/`FWS`), & Windows Shell (`.lnk`, `.library-ms`, `.settingcontent-ms`)**: Hex/zlib payload extraction and embedded script, deserialization, NTLM coercion, and executable detection.
 
 ---
 
@@ -101,7 +101,7 @@ usage: quicksand [-h] [--version] [-v] [-c] [-y] [-t SECONDS] [-p PASSWORD]
                  [-a FILE]
                  document
 
-QuickSand v2.2.0 - Document and PDF malware analysis tool.
+QuickSand v2.3.0 - Document and PDF malware analysis tool.
 Scans nested streams inside Office (OLE2, OpenXML, RTF, VBA, XLM), PDF,
 MIME/ActiveMime, PostScript, and OneNote files using YARA signatures.
 

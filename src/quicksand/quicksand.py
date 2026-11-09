@@ -1259,6 +1259,61 @@ class _RtfObjParser:
                     pass
 
 
+_LZFU_INIT_DICT = (
+    b"{\\rtf1\\ansi\\mac\\deff0\\deftab720{\\fonttbl;}{\\f0\\fnil \\froman \\fswiss "
+    b"\\fmodern \\fscript \\fdecor MS Sans SerifSymbolArialTimes New RomanCourier"
+    b"{\\colortbl\\red0\\green0\\blue0\r\n\\par \\pard\\plain\\f0\\fs20\\b\\i\\u\\tab\\tx"
+)
+
+
+def decompress_rtf_lzfu(data: bytes) -> bytes:
+    """Decompress a Microsoft MAPI Compressed RTF stream (LZFu / MELA, [MS-OXRTFCP])."""
+    if len(data) < 16:
+        return b""
+    comp_size, raw_size, magic, _crc = struct.unpack_from("<II4sI", data, 0)
+    max_out = min(raw_size, MAX_DECOMPRESSED_STREAM_SIZE)
+    if magic == b"MELA":
+        return data[16 : 16 + max_out]
+    if magic != b"LZFu":
+        return b""
+    buf = bytearray(4096)
+    buf[: len(_LZFU_INIT_DICT)] = _LZFU_INIT_DICT
+    wp = len(_LZFU_INIT_DICT)
+    out = bytearray()
+    pos = 16
+    end = min(len(data), 4 + comp_size)
+    while pos < end and len(out) < max_out:
+        flags = data[pos]
+        pos += 1
+        for bit in range(8):
+            if pos >= end or len(out) >= max_out:
+                break
+            if (flags >> bit) & 1:
+                if pos + 1 >= end:
+                    pos = end
+                    break
+                b1 = data[pos]
+                b2 = data[pos + 1]
+                pos += 2
+                offset = (b1 << 4) | (b2 >> 4)
+                length = (b2 & 0x0F) + 2
+                if offset == wp:
+                    return bytes(out)
+                for _ in range(length):
+                    b = buf[offset]
+                    offset = (offset + 1) & 0xFFF
+                    out.append(b)
+                    buf[wp] = b
+                    wp = (wp + 1) & 0xFFF
+            else:
+                b = data[pos]
+                pos += 1
+                out.append(b)
+                buf[wp] = b
+                wp = (wp + 1) & 0xFFF
+    return bytes(out[:max_out])
+
+
 # =====================================================================
 # Native PDF Stream Decoder & Object Parser
 # =====================================================================
@@ -1443,12 +1498,13 @@ def _pdf_flate_decode(data: bytes) -> bytes:
 
 def decode_pdf_stream(dict_bytes: bytes, raw_stream: bytes) -> Optional[bytes]:
     """Decode a PDF stream according to its dictionary /Filter and /DecodeParms."""
+    dict_unesc = RE_PDF_NAME_HEX.sub(lambda m: bytes([int(m.group(1), 16)]), dict_bytes)
     filters: List[str] = []
-    m_arr = RE_PDF_FILTER_ARRAY.search(dict_bytes)
+    m_arr = RE_PDF_FILTER_ARRAY.search(dict_unesc)
     if m_arr:
         filters = [_unescape_pdf_name(tok) for tok in RE_PDF_NAME_TOKEN.findall(m_arr.group(1))]
     else:
-        m_single = RE_PDF_FILTER_SINGLE.search(dict_bytes)
+        m_single = RE_PDF_FILTER_SINGLE.search(dict_unesc)
         if m_single:
             filters = [_unescape_pdf_name(m_single.group(1))]
 
@@ -1458,13 +1514,13 @@ def decode_pdf_stream(dict_bytes: bytes, raw_stream: bytes) -> Optional[bytes]:
     predictor = 1
     columns = 1
     early_change = 1
-    m_pred = RE_PDF_PREDICTOR.search(dict_bytes)
+    m_pred = RE_PDF_PREDICTOR.search(dict_unesc)
     if m_pred:
         predictor = int(m_pred.group(1))
-    m_cols = RE_PDF_COLUMNS.search(dict_bytes)
+    m_cols = RE_PDF_COLUMNS.search(dict_unesc)
     if m_cols:
         columns = int(m_cols.group(1))
-    m_ec = RE_PDF_EARLYCHANGE.search(dict_bytes)
+    m_ec = RE_PDF_EARLYCHANGE.search(dict_unesc)
     if m_ec:
         early_change = int(m_ec.group(1))
 
@@ -1552,7 +1608,7 @@ class quicksand:
         >>> print(qs.results["risk"], qs.results["score"])
     """
 
-    __version__ = "2.2.0"
+    __version__ = "2.3.0"
     __author__ = "tylabs.com"
     __copyright__ = "Copyright 2026, @tylabs"
     __license__ = "MIT"
@@ -1896,6 +1952,14 @@ class quicksand:
         try:
             self.scan_pdf(doc, str(loc))
 
+            # Normalize #xx hex-escaped PDF dictionary names (e.g. /#4f#70#65n#41#63t#69o#6e -> /OpenAction)
+            if re.search(rb"/[A-Za-z0-9_#]*#[4567][0-9a-fA-F]", doc):
+                stripped_pdf = re.sub(rb"stream[\r\n].*?endstream", b"stream\nendstream", doc, flags=re.S)
+                unescaped_pdf = RE_PDF_NAME_HEX.sub(lambda m: bytes([int(m.group(1), 16)]), stripped_pdf)
+                self.scan_pdf(unescaped_pdf, f"{loc}-pdf_unescaped")
+                if self.capture:
+                    self.results["streams"][f"{loc}-pdf_unescaped"] = unescaped_pdf
+
             for block in RE_PDF_STRUCTURE.findall(doc):
                 if len(block[2]) != 0:
                     try:
@@ -1924,26 +1988,53 @@ class quicksand:
                 self.msg(f"stream {num} {gen}")
 
                 decoded = decode_pdf_stream(dict_bytes, raw_stream)
-                if decoded is not None:
+                stream_payload = decoded if decoded is not None else raw_stream
+                if stream_payload:
                     pdf_object_loc = f"{loc}-pdf_{num}_{gen}"
-                    self.scan_pdf(decoded, pdf_object_loc)
+                    self.scan_pdf(stream_payload, pdf_object_loc)
                     if self.capture:
-                        self.results["streams"][pdf_object_loc] = decoded
+                        self.results["streams"][pdf_object_loc] = stream_payload
+
+                    # If this is an /EmbeddedFile stream or contains an archive/document/PE magic, analyze it
+                    norm_dict = RE_PDF_NAME_HEX.sub(
+                        lambda hx: bytes([int(hx.group(1), 16)]), dict_bytes
+                    )
+                    if b"/EmbeddedFile" in norm_dict or stream_payload.startswith(
+                        (b"Rar!", b"PK\x03\x04", b"MZ", b"\xd0\xcf\x11\xe0", b"{\\rtf")
+                    ):
+                        self.scan_exploit(stream_payload, pdf_object_loc)
+                        self.scan_exec(stream_payload, pdf_object_loc)
+                        self.analyze(stream_payload, f"{pdf_object_loc}-embedded")
 
                     # If this is a PDF 1.5+ /ObjStm compressed object stream, scan inner objects
-                    if b"/ObjStm" in dict_bytes:
-                        m_first = RE_PDF_OBJSTM_FIRST.search(dict_bytes)
+                    if decoded is not None and b"/ObjStm" in norm_dict:
+                        m_first = RE_PDF_OBJSTM_FIRST.search(norm_dict)
                         if m_first:
                             first_off = int(m_first.group(1))
                             if 0 < first_off < len(decoded):
                                 inner_body = decoded[first_off:]
                                 self.scan_pdf(inner_body, f"{pdf_object_loc}_objstm")
-                elif raw_stream:
-                    # Unfiltered stream
-                    pdf_object_loc = f"{loc}-pdf_{num}_{gen}"
-                    self.scan_pdf(raw_stream, pdf_object_loc)
-                    if self.capture:
-                        self.results["streams"][pdf_object_loc] = raw_stream
+
+            # Decode Base64 payloads hidden in PDF /V /<base64> name values (e.g., CVE-2026-34621)
+            for b64_idx, m_b64 in enumerate(re.finditer(rb"/V\s*/([A-Za-z0-9+#=/]{100,})", doc)):
+                if self._is_timed_out():
+                    break
+                try:
+                    raw_b64 = RE_PDF_NAME_HEX.sub(
+                        lambda hx: bytes([int(hx.group(1), 16)]), m_b64.group(1)
+                    )
+                    pad = (-len(raw_b64)) % 4
+                    if pad:
+                        raw_b64 += b"=" * pad
+                    b64_dec = base64.b64decode(raw_b64)[:MAX_DECOMPRESSED_STREAM_SIZE]
+                    if len(b64_dec) >= 32:
+                        b64_loc = f"{loc}-pdf_v_b64_{b64_idx}"
+                        self.scan_pdf(b64_dec, b64_loc)
+                        self.scan_exploit(b64_dec, b64_loc)
+                        if self.capture:
+                            self.results["streams"][b64_loc] = b64_dec
+                except Exception:
+                    pass
 
         except Exception as e:
             _, _, exc_traceback = sys.exc_info()
@@ -1965,7 +2056,14 @@ class quicksand:
         try:
             filebytes = BytesIO(doc)
             with zipfile.ZipFile(filebytes, allowZip64=True) as myzipfile:
-                for name in myzipfile.namelist()[:MAX_ARCHIVE_ENTRIES]:
+                entries = myzipfile.namelist()[:MAX_ARCHIVE_ENTRIES]
+                if entries:
+                    names_blob = "\n".join(entries).encode("utf-8", errors="replace")
+                    names_loc = f"{loc}-zip_filenames"
+                    self.scan_exploit(names_blob, names_loc)
+                    if self.capture:
+                        self.results["streams"][names_loc] = names_blob
+                for name in entries:
                     if self._is_timed_out():
                         break
                     with myzipfile.open(name) as zf:
@@ -2112,6 +2210,12 @@ class quicksand:
                     self.msg("RTFOLE DATA")
                     self.structure += f"rtfobjole@{obj.start},"
                     ole_loc = f"{loc}-rtfobjole@{obj.start}"
+                    if len(obj.rawdata) > len(obj.oledata) + 16:
+                        raw_loc = f"{loc}-rtfobj@{obj.start}"
+                        self.scan_exploit(obj.rawdata, raw_loc)
+                        self.scan_exec(obj.rawdata, raw_loc)
+                        if self.capture:
+                            self.results["streams"][raw_loc] = obj.rawdata
                     self.analyze(obj.oledata, ole_loc)
                     if self.capture:
                         self.results["streams"][ole_loc] = obj.oledata
@@ -2332,6 +2436,18 @@ class quicksand:
                         except Exception:
                             pass
 
+                    # Decompress Outlook .msg MAPI Compressed RTF streams (LZFu / MELA)
+                    if len(s) >= 16 and s[8:12] in (b"LZFu", b"MELA"):
+                        try:
+                            unc_rtf = decompress_rtf_lzfu(s)
+                            if unc_rtf:
+                                lzfu_loc = f"{myloc}-lzfu"
+                                self.analyze(unc_rtf, lzfu_loc)
+                                if self.capture:
+                                    self.results["streams"][lzfu_loc] = unc_rtf
+                        except Exception:
+                            pass
+
                     if OPENXML_MAGIC in s:
                         elements = self.carve(s, OPENXML_MAGIC)
                         if elements:
@@ -2518,7 +2634,7 @@ class quicksand:
 
             if doc_type == "ole":
                 self.analyse_ole(doc, loc)
-            elif doc_type == "openxml":
+            elif doc_type in ("openxml", "zip"):
                 self.analyse_openxml(doc, loc)
             elif doc_type == "rtf":
                 self.analyse_rtf(doc, loc)
@@ -2531,6 +2647,16 @@ class quicksand:
             else:
                 self.scan_exploit(doc, loc)
                 self.scan_exec(doc, loc)
+                # Decompress zlib-compressed Shockwave Flash (CWS) streams
+                if len(doc) > 8 and doc[:3] == b"CWS":
+                    swf_body = self.explode_gzuncompress(doc[8:90] + doc[90:]) if len(doc) > 90 else self.explode_gzuncompress(doc[8:])
+                    if swf_body:
+                        swf_unc = b"FWS" + doc[3:8] + swf_body
+                        swf_loc = f"{loc}-swf_decompressed"
+                        self.scan_exploit(swf_unc, swf_loc)
+                        self.scan_exec(swf_unc, swf_loc)
+                        if self.capture:
+                            self.results["streams"][swf_loc] = swf_unc
         finally:
             self._depth -= 1
 

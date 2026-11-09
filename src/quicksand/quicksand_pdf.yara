@@ -1642,8 +1642,8 @@ rule pdf_exploit_TIFF_overflow_CVE_2010_0188 {
 		is_exploit = true
 		is_warning = false
 		is_feature = false
-		rank = 5
-		revision = "1"
+		rank = 10
+		revision = "2"
 		date = "June 07 2020"
 		author = "@tylabs"
 		sigtype = "pdfexaminer_obfuscation"
@@ -2411,4 +2411,207 @@ rule pdf_exploit_smb_hash_leak_CVE_2018_4993 {
 	condition:
 		any of ($act*) and any of ($unc*)
 }
+
+rule pdf_exploit_fontmatrix_js_CVE_2024_4367 {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 10
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit Mozilla PDF.js FontMatrix arbitrary JavaScript execution (CVE-2024-4367)"
+		mitre = "T1203 T1059.007"
+	strings:
+		$fm = /\/FontMatrix\s*\[[^\]]{0,120}\([^\)]{1,400}\\\)/
+	condition:
+		$fm
+}
+
+rule pdf_exploit_foxit_uaf_CVE_2018_9948_9958 {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 10
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit Foxit Reader addAnnot destroy Use-After-Free RCE (CVE-2018-9948 / CVE-2018-9958)"
+		mitre = "T1203 T1059.007"
+	strings:
+		$s1 = "addAnnot(" nocase
+		$s2 = ".destroy()" nocase
+		$s3 = "ArrayBuffer(" nocase
+		$s4 = "Int32Array(" nocase
+	condition:
+		$s1 and $s2 and ($s3 or $s4)
+}
+
+rule pdf_exploit_cff_font_stack_overflow_CVE_2010_1797 {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 10
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit FreeType/CoolType CFF Type2 charstring stack overflow (CVE-2010-1797)"
+		mitre = "T1203"
+	strings:
+		$cff_hdr = { 01 00 04 01 }
+		$stack_push = { FF 00 00 00 00 FF 00 00 00 00 FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF [4] FF }
+	condition:
+		$cff_hdr at 0 and $stack_push
+}
+
+rule pdf_exploit_geturl_file_CVE_2017_10951 {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 9
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit Foxit Reader getURL local file execution (CVE-2017-10951)"
+		mitre = "T1203 T1204.002"
+	strings:
+		$s1 = /this\.getURL\s*\(\s*["']file:\/\//i
+		$s2 = /app\.launchURL\s*\(\s*["']file:\/\//i
+	condition:
+		any of them
+}
+
+rule pdf_exploit_js_string_reverse_eval_shellcode {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 9
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit obfuscated JavaScript string-reversal shellcode loader (CVE-2007-5659)"
+		mitre = "T1027 T1059.007"
+	strings:
+		$ev = "\"eval\")" nocase
+		$u1 = /['"]u%[0-9a-fA-F]{3,4}['"]/
+		$c1 = "harAt"
+		$c2 = "lengt"
+	condition:
+		$ev and #u1 >= 3 and ($c1 or $c2)
+}
+
+rule pdf_suspicious_name_hex_obfuscation {
+	meta:
+		is_exploit = false
+		is_warning = true
+		is_feature = false
+		rank = 4
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_obfuscation"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.warning dictionary name hex-escape obfuscation"
+		mitre = "T1027"
+	strings:
+		$f1 = /\/(F|#46|#66)(i|#69)(l|#6[cC])(t|#74)(e|#65)(r|#72)/
+		$f2 = /\/(O|#4[fF])(p|#70)(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
+		$f3 = /\/(F|#46|#66)(l|#6[cC])(a|#61)(t|#74)(e|#65)(D|#44|#64)(e|#65)(c|#63)(o|#6[fF])(d|#64)(e|#65)/
+		$f4 = /\/(J|#4[aA])(a|#61)(v|#76)(a|#61)(S|#53|#73)(c|#63)(r|#72)(i|#69)(p|#70)(t|#74)/
+		$plain1 = "/Filter"
+		$plain2 = "/OpenAction"
+		$plain3 = "/FlateDecode"
+		$plain4 = "/JavaScript"
+	condition:
+		(#f1 > #plain1) or (#f2 > #plain2) or (#f3 > #plain3) or (#f4 > #plain4)
+}
+
+rule pdf_exploit_CVE_2026_34621 {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 10
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit Adobe Acrobat/Reader UTF-16BE Names escape & Widget Base64 JS RCE (CVE-2026-34621)"
+		cve = "CVE-2026-34621"
+		mitre = "T1203 T1059.007"
+	strings:
+		$esc_utf16 = /<feff(001b){4,}/i
+		$widget_b64_1 = /\/V\s*\/(dmFyI|ZnVuY3Rpb24|KGZ1bmN0aW9u)[A-Za-z0-9+#=\/]{60,}/
+		$js_1 = "trustedFunction" ascii
+		$js_2 = "addFeed" ascii
+		$js_3 = "removeFeed" ascii
+		$js_4 = "/c/windows/system32/ntdll.dll" ascii nocase
+	condition:
+		$esc_utf16 or $widget_b64_1 or ($js_1 and ($js_2 or $js_3 or $js_4))
+}
+
+rule pdf_exploit_xfa_xxe_CVE_2025_66516 {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 10
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit Apache Tika/PDFBox XFA XML External Entity (XXE) injection (CVE-2025-66516)"
+		cve = "CVE-2025-66516"
+		mitre = "T1190 T1203"
+	strings:
+		$doctype = "<!DOCTYPE" ascii nocase
+		$entity = "<!ENTITY" ascii nocase
+		$system = /SYSTEM\s+["'](file|http|https|ftp):\/\//i
+		$xfa1 = "<xdp:xdp" ascii nocase
+		$xfa2 = "<!DOCTYPE xfa" ascii nocase
+	condition:
+		$doctype and $entity and $system and ($xfa1 or $xfa2)
+}
+
+rule pdf_exploit_embedded_rar_CVE_2025_8088 {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 10
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit embedded WinRAR archive with NTFS ADS path traversal (CVE-2025-8088)"
+		cve = "CVE-2025-8088"
+		mitre = "T1203 T1564.004"
+	strings:
+		$rar = { 52 61 72 21 1A 07 }
+		$ads_stm = /STM.{1,4}:(\.\.[\\\/]){2,}/s
+		$trav1 = ":..\\..\\..\\" ascii
+		$trav2 = ":../../../" ascii
+	condition:
+		$rar and ($ads_stm or $trav1 or $trav2)
+}
+
+
 
