@@ -1,0 +1,1 @@
+web: functions-framework --target=quicksand_combined --port=$PORT

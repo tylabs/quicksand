@@ -1,10 +1,14 @@
 # QuickSand for Google Cloud Run Functions
 
-- function/gcp_combined.py: Function code
+- function/main.py: Function code
 
 - function/requirements.txt: Python requirements
 
-- function/env.txt: Suggest environment variables
+- function/env.txt: Suggested environment variables
+
+- function/Dockerfile: Optional container image definition for Cloud Run
+
+- function/Procfile: Buildpack process definition
 
 - frontend/index.html: Simple file upload implementation
 
@@ -30,12 +34,14 @@ A single bucket is required, private access only, to store files and reports (/n
 
 - /search -> Search service
 
+- /health -> Health check endpoint
+
 
 
 ## Function Entry Point
 
 Cloud Run -> Write a Function -> Inline Editor
-Python 3.13
+Python 3
 
 - See env.txt for required environment variables.
 
@@ -81,7 +87,7 @@ Create this cors.json:
       "https://*.<website hosting front end>"
     ],
     "method": ["GET", "PUT", "POST", "DELETE", "OPTIONS"],
-    "responseHeader": ["*"]
+    "responseHeader": ["*"],
     "maxAgeSeconds": 3600
   }
 ]
