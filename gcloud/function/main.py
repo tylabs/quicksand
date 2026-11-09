@@ -32,7 +32,7 @@ from google.auth.transport import requests
 
 # Import quicksand module
 try:
-    from quicksand.quicksand import quicksand
+    from quicksand import quicksand
 except ImportError:
     print("Error: quicksand module not found. Please ensure it's installed in requirements.txt")
     raise
@@ -127,7 +127,7 @@ def cache_report(md5, sha1, sha256, sha512, data):
                 except Exception as e:
                     print(f"Error caching report {hash_val} ({hash_type}): {e}")
     except Exception as e:
-        print(f"Error caching report {hash_value}: {e}")
+        print(f"Error caching report for {sha256}: {e}")
 
 def check_report_recent(hash_value):
     if not qs_bucket_name:

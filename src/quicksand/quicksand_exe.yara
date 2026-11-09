@@ -62,17 +62,19 @@ rule executable_win {
 	meta:
 		is_exe = true
 		type = "win"
-		revision = "100"
+		revision = "101"
 		rank = 10
-		date = "July 29 2015"
+		date = "Nov 9 2026"
 		author = "@tylabs"
-		copyright = "tylabs.com 2015"
+		copyright = "tylabs.com 2026"
 		desc = "EXE strings"
 		mitre = "T1027"
 
 	strings:
-		$s1 = "This program cannot be run in DOS mode"
-		$s2 = "This program must be run under Win32"
+		$dos1 = "This program cannot be run in DOS mode"
+		$dos2 = "This program must be run under Win32"
+		$pe_hdr = {504500004C010100} // PE32 header
+		$pe64_hdr = {504500006486}   // PE64 header
 		$s4 = "LoadLibraryA"
 		$s5 = "GetModuleHandleA"
 		$s6 = "GetCommandLineA"
@@ -84,7 +86,6 @@ rule executable_win {
 		$s12 = "GetEnvironmentVariableA"
 		$s13 = "CloseHandle"
 		$s14 = "CreateFileA"
-		$s15 = "URLDownloadToFileA"
 		$s16 = "Advapi32.dll"
 		$s17 = "RegOpenKeyExA"
 		$s18 = "RegDeleteKeyA"
@@ -94,12 +95,10 @@ rule executable_win {
 		$s22 = "ExitProcess"
 		$s23 = "GetMessageA"
 		$s24 = "CreateWindowExA"
-		$s25 = {504500004C010100} // PE header
 		$s26 = "NtProtectVirtualMemory"
 		$s27 = "ntdll.dll"
-		$s28 = "CreateWindowExA"
 	condition:
-            1 of them and not executable_win_pe
+            (1 of ($dos*) or 1 of ($pe*) or 3 of ($s*)) and not executable_win_pe
 }
 
 
@@ -162,22 +161,23 @@ rule executable_win_reversed {
 rule executable_vb {
 	meta:
 		is_exe = true
-		revision = "100"
-		rank = 10
+		revision = "101"
+		rank = 8
 		type = "vb"
-		date = "July 29 2015"
+		date = "Nov 9 2026"
 		author = "@tylabs"
-		copyright = "tylabs.com 2015"
+		copyright = "tylabs.com 2026"
 		desc = "VB script"
 		mitre = "T1059.005"
 
 	strings:
-		$s1 = "impersonationLevel=impersonate"
-		$s2 = "On Error Resume Next"
-		$s3 = "WScript.CreateObject(\"WScript.Shell\")"
-		$s4 = "CreateObject(\"Scripting.FileSystemObject\")"
+		$s1 = "impersonationLevel=impersonate" nocase
+		$s2 = "WScript.CreateObject(\"WScript.Shell\")" nocase
+		$s3 = "CreateObject(\"Scripting.FileSystemObject\")" nocase
+		$s4 = "WScript.Sleep" nocase
+		$s5 = "WScript.Quit" nocase
 	condition:
-            1 of them
+            1 of ($s1, $s2) or 2 of ($s3, $s4, $s5)
 }
 
 
@@ -259,3 +259,89 @@ rule executable_unhandled_compression {
 	    $wim_magic at 0 or
 	    $xz_magic at 0
 }
+
+rule executable_encoded_pe {
+	meta:
+		is_exe = true
+		revision = "1"
+		rank = 10
+		type = "win-encoded"
+		date = "Nov 9 2026"
+		author = "@tylabs"
+		copyright = "tylabs.com 2026"
+		desc = "Base64 or Hex encoded Windows PE executable"
+		mitre = "T1027"
+	strings:
+		$b64_1 = "TVqQAAMAAAAEAAAA" ascii wide
+		$b64_2 = "TVpQAAIAAAAEAA8A" ascii wide
+		$b64_3 = "TVroAAAAAAA" ascii wide
+		$hex_1 = "4d5a90000300000004000000ffff0000" nocase ascii wide
+		$hex_2 = "546869732070726f6772616d2063616e6e6f742062652072756e20696e20444f53206d6f6465" nocase ascii wide
+	condition:
+		any of them
+}
+
+rule executable_lnk_shortcut {
+	meta:
+		is_exe = true
+		revision = "1"
+		rank = 8
+		type = "lnk"
+		date = "Nov 9 2026"
+		author = "@tylabs"
+		copyright = "tylabs.com 2026"
+		desc = "Embedded Windows LNK shortcut executing command or script"
+		mitre = "T1204.002"
+	strings:
+		$lnk_hdr = { 4C 00 00 00 01 14 02 00 00 00 00 00 C0 00 00 00 00 00 00 46 }
+		$cmd1 = "cmd.exe" nocase ascii wide
+		$cmd2 = "powershell" nocase ascii wide
+		$cmd3 = "mshta" nocase ascii wide
+		$cmd4 = "rundll32" nocase ascii wide
+		$cmd5 = "regsvr32" nocase ascii wide
+		$cmd6 = "wscript" nocase ascii wide
+		$cmd7 = "cscript" nocase ascii wide
+		$cmd8 = "certutil" nocase ascii wide
+	condition:
+		$lnk_hdr and 1 of ($cmd*)
+}
+
+rule executable_scriptlet_hta_sct {
+	meta:
+		is_exe = true
+		revision = "1"
+		rank = 8
+		type = "scriptlet"
+		date = "Nov 9 2026"
+		author = "@tylabs"
+		copyright = "tylabs.com 2026"
+		desc = "Embedded HTA or COM Scriptlet payload"
+		mitre = "T1218.005"
+	strings:
+		$hta = "<hta:application" nocase ascii wide
+		$sct1 = "<scriptlet" nocase ascii wide
+		$sct2 = "<registration" nocase ascii wide
+		$act1 = "ActiveXObject" nocase ascii wide
+		$act2 = "WScript.Shell" nocase ascii wide
+		$act3 = "GetObject(\"script:" nocase ascii wide
+	condition:
+		($hta and 1 of ($act*)) or ($sct1 and ($sct2 or 1 of ($act*)))
+}
+
+rule executable_elf {
+	meta:
+		is_exe = true
+		revision = "1"
+		rank = 10
+		type = "elf"
+		date = "Nov 9 2026"
+		author = "@tylabs"
+		copyright = "tylabs.com 2026"
+		desc = "ELF executable header"
+		mitre = "T1027"
+	strings:
+		$elf = { 7F 45 4C 46 (01 | 02) (01 | 02) 01 }
+	condition:
+		$elf at 0
+}
+

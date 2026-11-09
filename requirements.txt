@@ -1,7 +1,1 @@
-pdfreader
-oletools
-cryptography
-zipfile38
-msoffcrypto-tool
-olefile
 yara-python>=4.3.0

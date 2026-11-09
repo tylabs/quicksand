@@ -798,7 +798,7 @@ rule suspicious_obfuscation_toString {
 		is_warning = true
 		is_feature = false
 		rank = 1
-		revision = "1"
+		revision = "2"
 		date = "June 07 2020"
 		author = "@tylabs"
 		sigtype = "pdfexaminer_obfuscation"
@@ -808,8 +808,14 @@ rule suspicious_obfuscation_toString {
 
 	strings:
 		$h_raw1 = "toString(" nocase
+		$ctx1 = "eval" nocase
+		$ctx2 = "unescape" nocase
+		$ctx3 = "fromCharCode" nocase
+		$ctx4 = "/JavaScript" nocase
+		$ctx5 = "app." nocase
+		$ctx6 = "util." nocase
 
-	condition: filesize < 1MB and any of them
+	condition: filesize < 1MB and $h_raw1 and any of ($ctx*)
 }
 
 rule suspicious_obfuscation_using_substr {
@@ -818,7 +824,7 @@ rule suspicious_obfuscation_using_substr {
 		is_warning = true
 		is_feature = false
 		rank = 1
-		revision = "1"
+		revision = "2"
 		date = "June 07 2020"
 		author = "@tylabs"
 		sigtype = "pdfexaminer_obfuscation"
@@ -828,8 +834,14 @@ rule suspicious_obfuscation_using_substr {
 
 	strings:
 		$h_raw1 = "substr(" nocase
+		$ctx1 = "eval" nocase
+		$ctx2 = "unescape" nocase
+		$ctx3 = "fromCharCode" nocase
+		$ctx4 = "/JavaScript" nocase
+		$ctx5 = "app." nocase
+		$ctx6 = "util." nocase
 
-	condition: filesize < 1MB and any of them
+	condition: filesize < 1MB and $h_raw1 and any of ($ctx*)
 }
 
 rule suspicious_obfuscation_using_String_replace {
@@ -838,7 +850,7 @@ rule suspicious_obfuscation_using_String_replace {
 		is_warning = true
 		is_feature = false
 		rank = 1
-		revision = "1"
+		revision = "2"
 		date = "June 07 2020"
 		author = "@tylabs"
 		sigtype = "pdfexaminer_obfuscation"
@@ -848,9 +860,15 @@ rule suspicious_obfuscation_using_String_replace {
 
 	strings:
 		$h_reg1 = /'re'(.{1,24}?)'place'/
-		$h_raw2 = ".replace" nocase
+		$h_raw2 = ".replace(" nocase
+		$ctx1 = "eval" nocase
+		$ctx2 = "unescape" nocase
+		$ctx3 = "fromCharCode" nocase
+		$ctx4 = "/JavaScript" nocase
+		$ctx5 = "app." nocase
+		$ctx6 = "util." nocase
 
-	condition: filesize < 1MB and any of them
+	condition: filesize < 1MB and ($h_reg1 or ($h_raw2 and any of ($ctx*)))
 }
 
 rule suspicious_obfuscation_using_String_fromCharCode {
@@ -882,7 +900,7 @@ rule suspicious_obfuscation_using_substring {
 		is_warning = true
 		is_feature = false
 		rank = 1
-		revision = "1"
+		revision = "2"
 		date = "June 07 2020"
 		author = "@tylabs"
 		sigtype = "pdfexaminer_obfuscation"
@@ -892,8 +910,14 @@ rule suspicious_obfuscation_using_substring {
 
 	strings:
 		$h_reg1 = /\.substring(\s{0,3}?)\(/
+		$ctx1 = "eval" nocase
+		$ctx2 = "unescape" nocase
+		$ctx3 = "fromCharCode" nocase
+		$ctx4 = "/JavaScript" nocase
+		$ctx5 = "app." nocase
+		$ctx6 = "util." nocase
 
-	condition: filesize < 1MB and any of them
+	condition: filesize < 1MB and $h_reg1 and any of ($ctx*)
 }
 
 rule suspicious_obfuscation_using_util_byteToChar {
@@ -1195,20 +1219,48 @@ rule pdf_exploit_execute_EXE_file {
 rule pdf_warning_openaction {
 	meta:
 		is_exploit = false
-		is_warning = true
+		is_warning = false
 		is_feature = true
-		rank = 1
-		revision = "1"
+		rank = 0
+		revision = "2"
 		date = "July 14 2020"
 		author = "@tylabs"
-		sigtype = "pdfexaminer_obfuscation"
+		sigtype = "pdfexaminer_active"
 		copyright = "Copyright 2020 tylabs.com. All rights reserved."
-		desc = "pdf.warning OpenAction"
+		desc = "pdf.information OpenAction"
 		mitre = "T1203 T1204.002"
 
 	strings:
 		$h_reg1 = /\/(O|#4F)(p|#70)(e|#65)(n|#6e)(A|#41)(c|#63)(t|#74)(i|#69)(o|#6F)(n|6e)/
 	condition: any of them
+}
+
+rule pdf_suspicious_openaction_active {
+	meta:
+		is_exploit = false
+		is_warning = true
+		is_feature = true
+		rank = 3
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_active"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.warning OpenAction with active execution trigger"
+		mitre = "T1203 T1204.002"
+
+	strings:
+		$open = /\/(O|#4[Ff])(p|#70)(e|#65)(n|#6[Ee])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[Ff])(n|#6[Ee])/
+		$act1 = "/JavaScript" nocase
+		$act2 = "/JS"
+		$act3 = "/Launch" nocase
+		$act4 = "/SubmitForm" nocase
+		$act5 = "/ImportData" nocase
+		$act6 = "/RichMedia" nocase
+		$act7 = "/GoToR" nocase
+		$act8 = "/GoToE" nocase
+	condition:
+		$open and any of ($act*)
 }
 
 
@@ -2287,3 +2339,76 @@ rule pdf_exploit_JSF_obfuscated_payload {
             any of ($getField_val, $setTimeout_obf, $soap_obf)
 
 }
+
+rule pdf_exploit_exportDataObject_dropper {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 10
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit exportDataObject payload launch"
+		mitre = "T1203 T1059.007"
+	strings:
+		$s1 = "exportDataObject" nocase
+		$s2 = "cName" nocase
+		$s3 = "nLaunch" nocase
+	condition:
+		$s1 and ($s2 or $s3)
+}
+
+rule pdf_exploit_launch_action {
+	meta:
+		is_exploit = true
+		is_warning = true
+		is_feature = false
+		rank = 8
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit Launch action command execution"
+		mitre = "T1204.002 T1059"
+	strings:
+		$launch = /\/S\s*\/Launch/i
+		$win = "/Win"
+		$cmd1 = "cmd.exe" nocase
+		$cmd2 = "powershell" nocase
+		$cmd3 = "mshta" nocase
+		$cmd4 = "wscript" nocase
+		$cmd5 = "cscript" nocase
+	condition:
+		$launch and ($win or any of ($cmd*))
+}
+
+rule pdf_exploit_smb_hash_leak_CVE_2018_4993 {
+	meta:
+		is_exploit = true
+		is_warning = false
+		is_feature = false
+		rank = 8
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_exploit"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.exploit SMB NTLM hash leak via remote UNC path (CVE-2018-4993)"
+		mitre = "T1187"
+	strings:
+		$act1 = "/AA"
+		$act2 = "/OpenAction"
+		$act3 = "/GoToE"
+		$act4 = "/GoToR"
+		$act5 = "/Launch"
+		$act6 = "/SubmitForm"
+		$unc1 = /\/F\s*\(\\\\\\\\[a-zA-Z0-9._-]+/
+		$unc2 = /file:\/\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+/
+	condition:
+		any of ($act*) and any of ($unc*)
+}
+

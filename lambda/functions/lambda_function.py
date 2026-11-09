@@ -2,7 +2,7 @@
 ### Lambda function for AWS to process a document with quicksand
 
 import json
-from quicksand.quicksand import quicksand
+from quicksand import quicksand
 import pprint
 import boto3
 import botocore
