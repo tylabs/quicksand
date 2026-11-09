@@ -2613,5 +2613,82 @@ rule pdf_exploit_embedded_rar_CVE_2025_8088 {
 		$rar and ($ads_stm or $trav1 or $trav2)
 }
 
+rule pdf_suspicious_single_page_url {
+	meta:
+		is_exploit = false
+		is_warning = true
+		is_feature = false
+		rank = 6
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_warning"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.warning single-page PDF containing external URI link"
+		mitre = "T1566.001 T1204.001"
+	strings:
+		$pages1 = /\/Type\s*\/Pages\b[^>>]{0,200}\/Count\s+1\b/s
+		$pages2 = /\/Count\s+1\b[^>>]{0,200}\/Type\s*\/Pages\b/s
+		$multi1 = /\/Type\s*\/Pages\b[^>>]{0,200}\/Count\s+([2-9]|[1-9][0-9]+)/s
+		$multi2 = /\/Count\s+([2-9]|[1-9][0-9]+)\b[^>>]{0,200}\/Type\s*\/Pages\b/s
+		$uri = /\/URI\s*\(\s*https?:\/\//i
+	condition:
+		($pages1 or $pages2) and not ($multi1 or $multi2) and $uri
+}
+
+rule pdf_suspicious_download_lure_text {
+	meta:
+		is_exploit = false
+		is_warning = true
+		is_feature = false
+		rank = 6
+		revision = "1"
+		date = "Nov 09 2026"
+		author = "@tylabs"
+		sigtype = "pdfexaminer_warning"
+		copyright = "Copyright 2026 tylabs.com. All rights reserved."
+		desc = "pdf.warning PDF external link paired with download, attachment, or reader-error lure text"
+		mitre = "T1566.001 T1204.001"
+	strings:
+		$uri1 = "URI: http" ascii nocase
+		$uri2 = /\/URI\s*\(\s*https?:\/\//i
+
+		$act1 = "Download" ascii nocase
+		$act2 = "Click here" ascii nocase
+		$act3 = "clicking here" ascii nocase
+		$act4 = "View Document" ascii nocase
+		$act5 = "Open Document" ascii nocase
+		$act6 = "Access Document" ascii nocase
+		$act7 = "Read Document" ascii nocase
+		$act8 = "Review Document" ascii nocase
+		$act9 = "Unlock Document" ascii nocase
+		$act10 = "Decrypt Document" ascii nocase
+		$act11 = "下载" ascii
+		$act12 = "点击" ascii
+
+		$ctx1 = "attached file" ascii nocase
+		$ctx2 = "attached document" ascii nocase
+		$ctx3 = "attached confidential" ascii nocase
+		$ctx4 = "attached herewith" ascii nocase
+		$ctx5 = "Confidential Attachment" ascii nocase
+		$ctx6 = "Secured Document" ascii nocase
+		$ctx7 = "password" ascii nocase
+		$ctx8 = "passcode" ascii nocase
+		$ctx9 = "problem opening" ascii nocase
+		$ctx10 = "unable to open" ascii nocase
+		$ctx11 = "unable to display" ascii nocase
+		$ctx12 = "cannot display" ascii nocase
+		$ctx13 = "repaired" ascii nocase
+		$ctx14 = "compatible viewer" ascii nocase
+		$ctx15 = /\b[A-Za-z0-9_\- ]+\.(zip|rar|7z|iso|img)\b/i
+		$ctx16 = "遇到问题" ascii
+		$ctx17 = "已修复" ascii
+		$ctx18 = "密码" ascii
+		$ctx19 = "附件" ascii
+	condition:
+		($uri1 or $uri2) and any of ($act*) and any of ($ctx*)
+}
+
+
 
 

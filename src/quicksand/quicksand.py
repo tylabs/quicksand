@@ -1545,6 +1545,114 @@ def decode_pdf_stream(dict_bytes: bytes, raw_stream: bytes) -> Optional[bytes]:
     return curr
 
 
+def reconstruct_pdf_text(doc: bytes, decoded_streams: Dict[int, bytes]) -> bytes:
+    """Reconstruct readable UTF-8 text from PDF content streams using /ToUnicode CMaps and literal strings."""
+    obj_cmaps: Dict[int, Dict[Tuple[int, int], str]] = {}
+    merged_cmap: Dict[Tuple[int, int], str] = {}
+
+    for oid, sbytes in decoded_streams.items():
+        if b"begincmap" not in sbytes:
+            continue
+        cm: Dict[Tuple[int, int], str] = {}
+        for blk in re.findall(rb"beginbfchar(.*?)endbfchar", sbytes, re.S):
+            for src, dst in re.findall(rb"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>", blk):
+                try:
+                    ch = "".join(
+                        chr(int(dst[i : i + 4], 16)) for i in range(0, len(dst), 4)
+                    )
+                    key = (len(src), int(src, 16))
+                    cm[key] = ch
+                    merged_cmap.setdefault(key, ch)
+                except Exception:
+                    pass
+        for blk in re.findall(rb"beginbfrange(.*?)endbfrange", sbytes, re.S):
+            for lo, hi, dst in re.findall(
+                rb"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>", blk
+            ):
+                try:
+                    c_lo, c_hi, u_base = int(lo, 16), int(hi, 16), int(dst, 16)
+                    for c in range(c_lo, min(c_hi + 1, c_lo + 256)):
+                        ch = chr(u_base + (c - c_lo))
+                        key = (len(lo), c)
+                        cm[key] = ch
+                        merged_cmap.setdefault(key, ch)
+                except Exception:
+                    pass
+        if cm:
+            obj_cmaps[oid] = cm
+
+    font_obj_to_cmap: Dict[int, Dict[Tuple[int, int], str]] = {}
+    fn_to_cmap: Dict[str, Dict[Tuple[int, int], str]] = {}
+    for m_obj in re.finditer(rb"(\d+)\s+0\s+obj(.*?)endobj", doc, re.S):
+        try:
+            oid = int(m_obj.group(1))
+        except ValueError:
+            continue
+        body = m_obj.group(2)
+        m_tu = re.search(rb"/ToUnicode\s+(\d+)\s+0\s+R", body)
+        if m_tu:
+            tu_id = int(m_tu.group(1))
+            if tu_id in obj_cmaps:
+                font_obj_to_cmap[oid] = obj_cmaps[tu_id]
+                m_name = re.search(rb"/Name\s*/(F\d+)\b", body)
+                if m_name:
+                    fn_to_cmap[m_name.group(1).decode("ascii")] = obj_cmaps[tu_id]
+
+    for m_ref in re.finditer(rb"/(F\d+)\s+(\d+)\s+0\s+R", doc):
+        fn = m_ref.group(1).decode("ascii")
+        foid = int(m_ref.group(2))
+        if foid in font_obj_to_cmap:
+            fn_to_cmap[fn] = font_obj_to_cmap[foid]
+
+    lines: List[str] = []
+    for sbytes in decoded_streams.values():
+        if (
+            b"BT" not in sbytes
+            or b"ET" not in sbytes
+            or len(sbytes) > 262144
+            or sbytes.startswith((b"%!Font", b"\xff\xd8", b"\x89PNG", b"true\x00", b"\x00\x01\x00\x00"))
+        ):
+            continue
+        cur_font: Optional[str] = None
+        stream_parts: List[str] = []
+        for blk in re.findall(rb"BT(.*?)ET", sbytes, re.S):
+            out_chars: List[str] = []
+            for tok in re.finditer(rb"/(F\d+)\b|\(([^\)]*)\)|<([0-9A-Fa-f]+)>", blk):
+                if tok.group(1) is not None:
+                    cur_font = tok.group(1).decode("ascii")
+                elif tok.group(2) is not None:
+                    lit = tok.group(2)
+                    lit_clean = re.sub(rb"\\([\(\)\\])", rb"\1", lit)
+                    out_chars.append(lit_clean.decode("latin-1", errors="replace"))
+                elif tok.group(3) is not None:
+                    hx = tok.group(3)
+                    cm = fn_to_cmap.get(cur_font or "", merged_cmap)
+                    if not cm:
+                        continue
+                    step = 4 if any(k[0] == 4 for k in cm) else 2
+                    for i in range(0, len(hx) - (len(hx) % step), step):
+                        code = int(hx[i : i + step], 16)
+                        ch = cm.get((step, code)) or merged_cmap.get((step, code), "")
+                        out_chars.append(ch)
+            line_str = "".join(out_chars).strip()
+            if line_str:
+                lines.append(line_str)
+                stream_parts.append(line_str)
+        if len(stream_parts) > 1:
+            lines.append("".join(stream_parts))
+
+    uris = [
+        u.decode("latin-1", errors="replace")
+        for u in re.findall(rb"/URI\s*\(([^\)]+)\)", doc)
+    ]
+    for u in uris:
+        lines.append(f"URI: {u}")
+
+    if not lines:
+        return b""
+    return "\n".join(lines).encode("utf-8", errors="replace")
+
+
 def _resolve_default_yara_path(filename: str) -> str:
     """Resolve bundled YARA rule paths across standard installs and frozen Windows executables."""
     candidates: List[Path] = []
@@ -1974,6 +2082,7 @@ class quicksand:
                     self.structure += token + ","
                     self.msg(f"obj {token}")
 
+            decoded_streams: Dict[int, bytes] = {}
             for m in RE_PDF_OBJ_STREAM.finditer(doc):
                 if self._is_timed_out():
                     break
@@ -1990,6 +2099,7 @@ class quicksand:
                 decoded = decode_pdf_stream(dict_bytes, raw_stream)
                 stream_payload = decoded if decoded is not None else raw_stream
                 if stream_payload:
+                    decoded_streams[num] = stream_payload
                     pdf_object_loc = f"{loc}-pdf_{num}_{gen}"
                     self.scan_pdf(stream_payload, pdf_object_loc)
                     if self.capture:
@@ -2014,6 +2124,18 @@ class quicksand:
                             if 0 < first_off < len(decoded):
                                 inner_body = decoded[first_off:]
                                 self.scan_pdf(inner_body, f"{pdf_object_loc}_objstm")
+
+            # Reconstruct CMap / ToUnicode and literal page text for lure & content scanning
+            if decoded_streams and not self._is_timed_out():
+                try:
+                    text_blob = reconstruct_pdf_text(doc, decoded_streams)
+                    if text_blob:
+                        text_loc = f"{loc}-pdf_text"
+                        self.scan_pdf(text_blob, text_loc)
+                        if self.capture:
+                            self.results["streams"][text_loc] = text_blob
+                except Exception:
+                    pass
 
             # Decode Base64 payloads hidden in PDF /V /<base64> name values (e.g., CVE-2026-34621)
             for b64_idx, m_b64 in enumerate(re.finditer(rb"/V\s*/([A-Za-z0-9+#=/]{100,})", doc)):
