@@ -363,7 +363,7 @@ rule shellcode_hash__WriteFile {
 		sigtype = "pdfexaminer_shellcode"
 		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  WriteFile"
-		mitre = "T1059"
+		mitre = "T1106"
 
 	strings:
 		$h_raw = "1f790ae8" nocase
@@ -605,7 +605,7 @@ rule shellcode_hash__URLDownloadToFileA {
 		sigtype = "pdfexaminer_shellcode"
 		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "shellcode.hash  URLDownloadToFileA"
-		mitre = "T1106"
+		mitre = "T1106 T1105"
 
 	strings:
 		$h_raw = "361a2f70" nocase
@@ -1091,6 +1091,7 @@ rule suspicious_flash_Adobe_Shockwave_Flash_in_a_PDF_define_obj_type {
 		sigtype = "pdfexaminer_obfuscation"
 		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.flash Adobe Shockwave Flash in a PDF define obj type"
+		mitre = "T1204.002"
 	strings:
 		$h_hex1 = { (52|233532) (69|233639) (63|233633) (68|233638) (4D|233444|233464) (65|233635) (64|233634) (69|233639)(61|233631) }
 
@@ -1708,6 +1709,7 @@ rule suspicious_flash_Embedded_Flash {
 		sigtype = "pdfexaminer_obfuscation"
 		copyright = "Copyright 2020 tylabs.com. All rights reserved."
 		desc = "suspicious.flash Embedded Flash"
+		mitre = "T1204.002"
 	strings:
 		$h_reg1 = /^FWS/
 		$h_reg2 = /^CWS/

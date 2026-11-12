@@ -101,7 +101,7 @@ usage: quicksand [-h] [--version] [-v] [-c] [-y] [-t SECONDS] [-p PASSWORD]
                  [-a FILE]
                  document
 
-QuickSand v2.3.0 - Document and PDF malware analysis tool.
+QuickSand v2.3.1 - Document and PDF malware analysis tool.
 Scans nested streams inside Office (OLE2, OpenXML, RTF, VBA, XLM), PDF,
 MIME/ActiveMime, PostScript, and OneNote files using YARA signatures.
 

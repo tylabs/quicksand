@@ -1716,7 +1716,7 @@ class quicksand:
         >>> print(qs.results["risk"], qs.results["score"])
     """
 
-    __version__ = "2.3.0"
+    __version__ = "2.3.1"
     __author__ = "tylabs.com"
     __copyright__ = "Copyright 2026, @tylabs"
     __license__ = "MIT"

@@ -11,7 +11,7 @@ rule executable_win_pe {
 		author = "@tylabs"
 		desc = "MZ Header"
 		copyright = "tylabs.com 2015"
-		mitre = "T1027"
+		mitre = "T1027 T1027.009"
 
 	strings:
 		$s1 = /MZ.{76}This program /
@@ -28,7 +28,7 @@ rule executable_win_pe_transposed {
 		date = "Dec 27 2015"
 		author = "@tylabs"
 		desc = "MZ Transposed"
-		mitre = "T1027"
+		mitre = "T1027 T1027.013"
 		copyright = "tylabs.com 2015"
 
 	strings:
@@ -48,7 +48,7 @@ rule executable_win_pe_transposed_offbyone {
 		author = "@tylabs"
 		desc = "MZ transposed and shifted"
 		copyright = "tylabs.com 2015"
-		mitre = "T1027"
+		mitre = "T1027 T1027.013"
 
 	strings:
 		$s1 = /Z.{76}ih srpgoar macnntob  eur nniD SOm do/
@@ -68,7 +68,7 @@ rule executable_win {
 		author = "@tylabs"
 		copyright = "tylabs.com 2026"
 		desc = "EXE strings"
-		mitre = "T1027"
+		mitre = "T1027 T1027.009"
 
 	strings:
 		$dos1 = "This program cannot be run in DOS mode"
@@ -114,7 +114,7 @@ rule executable_win_transposed {
 		desc = "Transposition cipher"
 		author = "@tylabs"
 		copyright = "tylabs.com 2015"
-		mitre = "T1027"
+		mitre = "T1027 T1027.013"
 
 	strings:
 		$s1 = "hTsip orrgmac naon tebr nui  nOD Somed" //string.transposition cipher of This program cannot be run in DOS mode
@@ -132,7 +132,7 @@ rule executable_win_rtl {
 		desc = "Right to Left compression LZNT1"
 		author = "@tylabs"
 		copyright = "tylabs.com 2015"
-		mitre = "T1027"
+		mitre = "T1027 T1027.013"
 	strings:
 		$s1 = {2070726F6772616D002063616E6E6F74200062652072756E2069006E20444F53206D6F} // string.RTL.This program cannot be run in DOS mode
 	condition:
@@ -149,7 +149,7 @@ rule executable_win_reversed {
 		desc = "EXE is stored backwards"
 		author = "@tylabs"
 		copyright = "tylabs.com 2015"
-		mitre = "T1027"
+		mitre = "T1027 T1027.013"
 	strings:
 		$s1 = "edom SOD ni nur eb tonnac margorp sihT" // string.reverse This program cannot be run in DOS mode	condition:
 	condition:
@@ -191,7 +191,7 @@ rule executable_macosx {
 		author = "@tylabs"
 		copyright = "tylabs.com 2015"
 		desc = "Mac executable"
-		mitre = "T1027"
+		mitre = "T1027 T1027.009"
 
 
 	strings:
@@ -270,7 +270,7 @@ rule executable_encoded_pe {
 		author = "@tylabs"
 		copyright = "tylabs.com 2026"
 		desc = "Base64 or Hex encoded Windows PE executable"
-		mitre = "T1027"
+		mitre = "T1027 T1027.013"
 	strings:
 		$b64_1 = "TVqQAAMAAAAEAAAA" ascii wide
 		$b64_2 = "TVpQAAIAAAAEAA8A" ascii wide
@@ -291,7 +291,7 @@ rule executable_lnk_shortcut {
 		author = "@tylabs"
 		copyright = "tylabs.com 2026"
 		desc = "Embedded Windows LNK shortcut executing command or script"
-		mitre = "T1204.002"
+		mitre = "T1204.002 T1059.003 T1547.009"
 	strings:
 		$lnk_hdr = { 4C 00 00 00 01 14 02 00 00 00 00 00 C0 00 00 00 00 00 00 46 }
 		$cmd1 = "cmd.exe" nocase ascii wide
@@ -316,7 +316,7 @@ rule executable_scriptlet_hta_sct {
 		author = "@tylabs"
 		copyright = "tylabs.com 2026"
 		desc = "Embedded HTA or COM Scriptlet payload"
-		mitre = "T1218.005"
+		mitre = "T1218.005 T1218.010"
 	strings:
 		$hta = "<hta:application" nocase ascii wide
 		$sct1 = "<scriptlet" nocase ascii wide
@@ -338,10 +338,36 @@ rule executable_elf {
 		author = "@tylabs"
 		copyright = "tylabs.com 2026"
 		desc = "ELF executable header"
-		mitre = "T1027"
+		mitre = "T1027 T1027.009"
 	strings:
 		$elf = { 7F 45 4C 46 (01 | 02) (01 | 02) 01 }
 	condition:
 		$elf at 0
+}
+
+rule executable_container_disk_image_cab {
+	meta:
+		is_exe = true
+		revision = "1"
+		rank = 6
+		type = "container"
+		date = "Nov 12 2026"
+		author = "@tylabs"
+		copyright = "tylabs.com 2026"
+		desc = "Embedded ISO/UDF/VHD/VHDX disk image or CAB container (Mark-of-the-Web bypass)"
+		mitre = "T1553.005 T1204.002"
+	strings:
+		$iso_cd001 = "CD001" ascii
+		$udf_bea01 = { 00 42 45 41 30 31 01 }
+		$vhd_hdr = "conectix" ascii
+		$vhdx_hdr = "vhdxfile" ascii
+		$cab_hdr = { 4D 53 43 46 00 00 00 00 }
+	condition:
+		$iso_cd001 at 0x8001 or
+		$iso_cd001 at 0x8801 or
+		$udf_bea01 at 0x8000 or
+		$vhd_hdr at 0 or
+		$vhdx_hdr at 0 or
+		$cab_hdr at 0
 }
 
