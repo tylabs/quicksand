@@ -39,9 +39,18 @@ import zipfile
 import zlib
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, Union
 
 import yara
+
+try:
+    from cryptography.hazmat.primitives.ciphers import Cipher as _CryptoCipher
+    from cryptography.hazmat.primitives.ciphers import algorithms as _crypto_algorithms
+    from cryptography.hazmat.primitives.ciphers import modes as _crypto_modes
+
+    _HAS_CRYPTOGRAPHY = True
+except Exception:
+    _HAS_CRYPTOGRAPHY = False
 
 
 # =====================================================================
@@ -49,11 +58,17 @@ import yara
 # =====================================================================
 
 MAX_DECOMPRESSED_STREAM_SIZE = 32 * 1024 * 1024  # 32 MB cap per decompressed stream
+MAX_TOTAL_EXTRACTED_BYTES = 128 * 1024 * 1024    # 128 MB cumulative decoded/extracted bytes per scan
+MAX_CAPTURED_BYTES = 64 * 1024 * 1024            # 64 MB cumulative bytes stored in results["streams"]
 MAX_ARCHIVE_ENTRIES = 1024                       # Max files scanned inside a single ZIP/OpenXML container
+MAX_TOTAL_STREAMS = 2048                         # Max total nested streams analyzed per document
+MAX_OLE_DIR_ENTRIES = 4096                       # Max directory entries loaded per OLE2 container
 MAX_CARVED_ELEMENTS = 64                         # Max carved sub-streams per container stream
 MAX_NESTING_DEPTH = 10                           # Max recursive container analysis depth
+MAX_PDF_FILTERS = 8                              # Max chained PDF /Filter stages per stream
 MAX_PDF_PREDICTOR_COLUMNS = 65536                # Max PNG predictor row width in bytes
 MAX_AGILE_SPIN_COUNT = 250000                    # Max ECMA-376 Agile KDF iterations (standard is 100,000)
+MAX_PURE_PYTHON_AES_BYTES = 4 * 1024 * 1024      # Max ciphertext decrypted via pure-Python AES fallback
 
 
 # =====================================================================
@@ -77,10 +92,8 @@ RE_XML_HEADER = re.compile(rb"xml", re.IGNORECASE)
 RE_PDF_STRUCTURE = re.compile(
     rb"((\x0a|\x0d|\x20)(\d{1,6})[^\d]{1,3}(\d{1,2})\sobj|(\x0a|\x0d)(xref|trailer)(\x0a|\x0d))"
 )
-RE_PDF_OBJ_STREAM = re.compile(
-    rb"(?:^|[\x0a\x0d\x20])(\d{1,7})\s+(\d{1,5})\s+obj\b((?:(?!endobj\b).)*?)stream(?:\r\n|\n|\r)(.*?)(?:\r\n|\n|\r)?endstream",
-    re.DOTALL,
-)
+RE_PDF_OBJ_HEADER = re.compile(rb"(?:^|[\x0a\x0d\x20])(\d{1,7})\s+(\d{1,5})\s+obj\b")
+RE_PDF_ZERO_OBJ_HEADER = re.compile(rb"(?:^|[\x0a\x0d\x20])(\d{1,7})\s+0\s+obj\b")
 RE_PDF_NAME_HEX = re.compile(rb"#([0-9a-fA-F]{2})")
 RE_PDF_FILTER_ARRAY = re.compile(rb"/Filter\s*\[([^\]]+)\]", re.DOTALL)
 RE_PDF_FILTER_SINGLE = re.compile(rb"/Filter\s*/([A-Za-z0-9#]+)")
@@ -98,7 +111,7 @@ RE_RTF_DATASTORE_BLOCK = re.compile(rb"datastore ([a-zA-Z0-9 \x0a\x0d]{512,})")
 RE_RTF_WHITESPACE = re.compile(rb"[ \t\x0a\x0d]")
 RE_MSO_BASE64 = re.compile(rb"([a-zA-Z0-9/+=\x0a\x0d]{256,})")
 RE_PS_HEX_STRING = re.compile(rb"<([0-9a-fA-F\x0a\x0d\x20\x09]{32,})>")
-RE_PS_HEX_BLOCK = re.compile(rb"(?:^|[\x0a\x0d\x20\x09])([0-9a-fA-F\x0a\x0d\x20\x09]{64,})(?=$|[\x0a\x0d\x20\x09])")
+RE_PS_HEX_RUN = re.compile(rb"[0-9a-fA-F\x0a\x0d\x20\x09]{64,}")
 
 
 # =====================================================================
@@ -244,19 +257,36 @@ def _aes_decrypt_block(block: bytes, round_keys: List[List[int]]) -> bytes:
     return bytes(s[i] ^ rk0[i] for i in range(16))
 
 
-def _aes_ecb_decrypt(key: bytes, data: bytes) -> bytes:
+def _aes_ecb_decrypt(key: bytes, data: bytes, deadline: Optional[float] = None) -> bytes:
+    aligned_len = len(data) - (len(data) % 16)
+    if aligned_len <= 0:
+        return b""
+    if _HAS_CRYPTOGRAPHY and len(key) in (16, 24, 32):
+        decryptor = _CryptoCipher(_crypto_algorithms.AES(key), _crypto_modes.ECB()).decryptor()
+        return decryptor.update(data[:aligned_len]) + decryptor.finalize()
     rks = _aes_expand_key(key)
     out = bytearray()
-    for offset in range(0, len(data) - (len(data) % 16), 16):
+    for blk_idx, offset in enumerate(range(0, aligned_len, 16)):
+        if deadline and (blk_idx & 0x3FF) == 0 and time.time() > deadline:
+            break
         out.extend(_aes_decrypt_block(data[offset : offset + 16], rks))
     return bytes(out)
 
 
-def _aes_cbc_decrypt(key: bytes, iv: bytes, data: bytes) -> bytes:
+def _aes_cbc_decrypt(key: bytes, iv: bytes, data: bytes, deadline: Optional[float] = None) -> bytes:
+    aligned_len = len(data) - (len(data) % 16)
+    if aligned_len <= 0:
+        return b""
+    iv16 = iv[:16] if len(iv) >= 16 else (iv + b"\x00" * (16 - len(iv)))
+    if _HAS_CRYPTOGRAPHY and len(key) in (16, 24, 32):
+        decryptor = _CryptoCipher(_crypto_algorithms.AES(key), _crypto_modes.CBC(iv16)).decryptor()
+        return decryptor.update(data[:aligned_len]) + decryptor.finalize()
     rks = _aes_expand_key(key)
     out = bytearray()
-    prev = iv[:16]
-    for offset in range(0, len(data) - (len(data) % 16), 16):
+    prev = iv16
+    for blk_idx, offset in enumerate(range(0, aligned_len, 16)):
+        if deadline and (blk_idx & 0x3FF) == 0 and time.time() > deadline:
+            break
         blk = data[offset : offset + 16]
         dec = _aes_decrypt_block(blk, rks)
         out.extend(dec[i] ^ prev[i] for i in range(16))
@@ -429,7 +459,8 @@ class _OleFile:
         return raw
 
     def _load_directory(self) -> None:
-        dir_data = self._read_chain(self.first_dir_sector)
+        max_dir_bytes = MAX_OLE_DIR_ENTRIES * 128
+        dir_data = self._read_chain(self.first_dir_sector, max_dir_bytes)
         for i in range(0, len(dir_data) - 127, 128):
             entry = _OleDirEntry(dir_data[i : i + 128], i // 128, is_v3=self.is_v3)
             self.dir_entries.append(entry)
@@ -469,9 +500,11 @@ class _OleFile:
             return
         root = self.dir_entries[0]
         if root.start_sector not in (ENDOFCHAIN, FREESECT):
-            self.mini_stream = self._read_chain(root.start_sector, root.size)
+            self.mini_stream = self._read_chain(
+                root.start_sector, min(root.size, MAX_DECOMPRESSED_STREAM_SIZE)
+            )
         if self.first_minifat_sector not in (ENDOFCHAIN, FREESECT):
-            minifat_bytes = self._read_chain(self.first_minifat_sector)
+            minifat_bytes = self._read_chain(self.first_minifat_sector, MAX_DECOMPRESSED_STREAM_SIZE)
             count = len(minifat_bytes) // 4
             if count > 0:
                 self.minifat = list(struct.unpack(f"<{count}I", minifat_bytes[: count * 4]))
@@ -604,13 +637,17 @@ class _OleFile:
 # Native [MS-OVBA] VBA Macro Stream Decompression
 # =====================================================================
 
-def decompress_vba_container(container: bytes, max_output: int = MAX_DECOMPRESSED_STREAM_SIZE) -> bytes:
-    """Decompress a single MS-OVBA CompressedContainer starting with 0x01."""
-    if not container or container[0] != 0x01:
-        return b""
-    pos = 1
-    out = bytearray()
+def decompress_vba_container(
+    container: bytes,
+    max_output: int = MAX_DECOMPRESSED_STREAM_SIZE,
+    start_offset: int = 0,
+) -> bytes:
+    """Decompress a single MS-OVBA CompressedContainer starting with 0x01 at ``start_offset``."""
     n = len(container)
+    if start_offset < 0 or start_offset >= n or container[start_offset] != 0x01:
+        return b""
+    pos = start_offset + 1
+    out = bytearray()
     while pos + 2 <= n and len(out) < max_output:
         header = struct.unpack_from("<H", container, pos)[0]
         pos += 2
@@ -663,19 +700,21 @@ def decompress_vba_stream(stream_data: bytes) -> bytes:
     if not stream_data:
         return b""
     if stream_data[0] == 0x01:
-        dec = decompress_vba_container(stream_data)
+        dec = decompress_vba_container(stream_data, start_offset=0)
         if dec:
             return dec
     # Search for compressed container signature (0x01 followed by a valid chunk header with sig 0b011)
     idx = 0
     n = len(stream_data)
-    while idx < n - 3:
+    probes = 0
+    while idx < n - 3 and probes < 256:
         pos = stream_data.find(b"\x01", idx)
         if pos == -1 or pos + 3 > n:
             break
         hdr = struct.unpack_from("<H", stream_data, pos + 1)[0]
         if ((hdr >> 12) & 0x07) == 0b011 and ((hdr >> 15) & 0x01) == 1:
-            dec = decompress_vba_container(stream_data[pos:])
+            probes += 1
+            dec = decompress_vba_container(stream_data, start_offset=pos)
             if b"Attribute VB_" in dec or len(dec) > 64:
                 return dec
         idx = pos + 1
@@ -897,9 +936,16 @@ def is_ole_encrypted(ole: _OleFile) -> bool:
     return False
 
 
-def _decrypt_standard_ecma376(enc_info: bytes, enc_pkg: bytes, password: str) -> Optional[bytes]:
+def _decrypt_standard_ecma376(
+    enc_info: bytes,
+    enc_pkg: bytes,
+    password: str,
+    deadline: Optional[float] = None,
+) -> Optional[bytes]:
     """Decrypt ECMA-376 Standard Encryption (AES-128/192/256 ECB or CryptoAPI RC4)."""
     if len(enc_info) < 40 or len(enc_pkg) < 8:
+        return None
+    if deadline and time.time() > deadline:
         return None
     v_major, v_minor, _flags = struct.unpack_from("<HHI", enc_info, 0)
     if v_minor != 2 or v_major not in (2, 3, 4):
@@ -926,25 +972,38 @@ def _decrypt_standard_ecma376(enc_info: bytes, enc_pkg: bytes, password: str) ->
     if alg_id in (0x0000660E, 0x0000660F, 0x00006610):  # AES-128, AES-192, AES-256
         h = hashlib.sha1(salt + pw_bytes).digest()
         for i in range(50000):
+            if deadline and (i & 0x1FFF) == 0 and time.time() > deadline:
+                return None
             h = hashlib.sha1(struct.pack("<I", i) + h).digest()
         h_final = hashlib.sha1(h + struct.pack("<I", 0)).digest()
         cb_key = key_bits // 8
         x1 = hashlib.sha1(bytes(b ^ 0x36 for b in h_final) + b"\x36" * 44).digest()
         x2 = hashlib.sha1(bytes(b ^ 0x5C for b in h_final) + b"\x5C" * 44).digest()
         key = (x1 + x2)[:cb_key]
-        dec_verifier = _aes_ecb_decrypt(key, enc_verifier)
-        dec_verifier_hash = _aes_ecb_decrypt(key, enc_verifier_hash)
+        dec_verifier = _aes_ecb_decrypt(key, enc_verifier, deadline=deadline)
+        dec_verifier_hash = _aes_ecb_decrypt(key, enc_verifier_hash, deadline=deadline)
         if hashlib.sha1(dec_verifier).digest() != dec_verifier_hash[:20]:
             return None
-        orig_size = struct.unpack_from("<Q", enc_pkg, 0)[0]
-        decrypted = _aes_ecb_decrypt(key, enc_pkg[8:])
+        orig_size = min(struct.unpack_from("<Q", enc_pkg, 0)[0], MAX_DECOMPRESSED_STREAM_SIZE)
+        max_ct = MAX_DECOMPRESSED_STREAM_SIZE if _HAS_CRYPTOGRAPHY else MAX_PURE_PYTHON_AES_BYTES
+        ciphertext = enc_pkg[8 : 8 + max_ct]
+        decrypted = _aes_ecb_decrypt(key, ciphertext, deadline=deadline)
+        if deadline and time.time() > deadline:
+            return None
         return decrypted[:orig_size]
     return None
 
 
-def _decrypt_agile_ecma376(enc_info: bytes, enc_pkg: bytes, password: str) -> Optional[bytes]:
+def _decrypt_agile_ecma376(
+    enc_info: bytes,
+    enc_pkg: bytes,
+    password: str,
+    deadline: Optional[float] = None,
+) -> Optional[bytes]:
     """Decrypt ECMA-376 Agile Encryption (v4.4 XML descriptor)."""
     if len(enc_info) < 16 or len(enc_pkg) < 8:
+        return None
+    if deadline and time.time() > deadline:
         return None
     v_major, v_minor = struct.unpack_from("<HH", enc_info, 0)
     if v_major != 4 or v_minor != 4:
@@ -976,6 +1035,8 @@ def _decrypt_agile_ecma376(enc_info: bytes, enc_pkg: bytes, password: str) -> Op
         hash_fn = hashlib.sha512 if "512" in hash_alg else (hashlib.sha384 if "384" in hash_alg else hashlib.sha1)
         h = hash_fn(pw_salt + password.encode("utf-16-le")).digest()
         for i in range(spin_count):
+            if deadline and (i & 0x1FFF) == 0 and time.time() > deadline:
+                return None
             h = hash_fn(struct.pack("<I", i) + h).digest()
 
         def derive_key(block_key: bytes) -> bytes:
@@ -989,33 +1050,40 @@ def _decrypt_agile_ecma376(enc_info: bytes, enc_pkg: bytes, password: str) -> Op
         k_ver_val = derive_key(b"\xd7\xaa\x0f\x6d\x30\x61\x34\x4e")
         k_key_val = derive_key(b"\x14\x6e\x0b\xe7\xab\xac\xd0\xd6")
 
-        ver_in = _aes_cbc_decrypt(k_ver_in, pw_salt[:16], enc_verifier_input)
-        ver_val = _aes_cbc_decrypt(k_ver_val, pw_salt[:16], enc_verifier_value)
+        ver_in = _aes_cbc_decrypt(k_ver_in, pw_salt[:16], enc_verifier_input, deadline=deadline)
+        ver_val = _aes_cbc_decrypt(k_ver_val, pw_salt[:16], enc_verifier_value, deadline=deadline)
         calc_hash = hash_fn(ver_in).digest()
         if ver_val[: len(calc_hash)] != calc_hash:
             return None
 
-        secret_key = _aes_cbc_decrypt(k_key_val, pw_salt[:16], enc_key_value)
+        secret_key = _aes_cbc_decrypt(k_key_val, pw_salt[:16], enc_key_value, deadline=deadline)
         kd_salt = base64.b64decode(key_data.attrib["saltValue"])
         kd_block_size = int(key_data.attrib.get("blockSize", "16"))
         kd_hash_alg = key_data.attrib.get("hashAlgorithm", "SHA512").upper()
         kd_hash_fn = hashlib.sha512 if "512" in kd_hash_alg else (hashlib.sha384 if "384" in kd_hash_alg else hashlib.sha1)
 
-        orig_size = struct.unpack_from("<Q", enc_pkg, 0)[0]
-        payload = enc_pkg[8:]
+        orig_size = min(struct.unpack_from("<Q", enc_pkg, 0)[0], MAX_DECOMPRESSED_STREAM_SIZE)
+        max_ct = MAX_DECOMPRESSED_STREAM_SIZE if _HAS_CRYPTOGRAPHY else MAX_PURE_PYTHON_AES_BYTES
+        payload = enc_pkg[8 : 8 + max_ct]
         out = bytearray()
         for seg_idx, offset in enumerate(range(0, len(payload), 4096)):
+            if deadline and (seg_idx & 0x0F) == 0 and time.time() > deadline:
+                return None
             chunk = payload[offset : offset + 4096]
             if len(chunk) % 16 != 0:
                 chunk = chunk + b"\x00" * (16 - (len(chunk) % 16))
             iv = kd_hash_fn(kd_salt + struct.pack("<I", seg_idx)).digest()[:kd_block_size]
-            out.extend(_aes_cbc_decrypt(secret_key, iv, chunk))
+            out.extend(_aes_cbc_decrypt(secret_key, iv, chunk, deadline=deadline))
         return bytes(out[:orig_size])
     except Exception:
         return None
 
 
-def decrypt_ole_document(ole: _OleFile, password: Optional[str] = None) -> Optional[bytes]:
+def decrypt_ole_document(
+    ole: _OleFile,
+    password: Optional[str] = None,
+    deadline: Optional[float] = None,
+) -> Optional[bytes]:
     """Attempt to decrypt an encrypted Office OLE container using supplied and default passwords."""
     passwords: List[str] = []
     if password is not None:
@@ -1029,10 +1097,12 @@ def decrypt_ole_document(ole: _OleFile, password: Optional[str] = None) -> Optio
         enc_info = ole.openstream(stream_names["encryptioninfo"]).read()
         enc_pkg = ole.openstream(stream_names["encryptedpackage"]).read()
         for pw in passwords:
-            res = _decrypt_standard_ecma376(enc_info, enc_pkg, pw)
+            if deadline and time.time() > deadline:
+                return None
+            res = _decrypt_standard_ecma376(enc_info, enc_pkg, pw, deadline=deadline)
             if res is not None:
                 return res
-            res = _decrypt_agile_ecma376(enc_info, enc_pkg, pw)
+            res = _decrypt_agile_ecma376(enc_info, enc_pkg, pw, deadline=deadline)
             if res is not None:
                 return res
     return None
@@ -1196,14 +1266,23 @@ class _RtfObjParser:
 
     _RE_OBJDATA = re.compile(rb"\\objdata\b", re.IGNORECASE)
 
-    def __init__(self, data: bytes) -> None:
+    def __init__(self, data: bytes, deadline: Optional[float] = None) -> None:
         self.data = data
+        self.deadline = deadline
         self.objects: List[_RtfObject] = []
 
     def parse(self) -> None:
         data = self.data
         n = len(data)
+        max_hex_chars = MAX_DECOMPRESSED_STREAM_SIZE * 2
+        last_end = 0
         for m in self._RE_OBJDATA.finditer(data):
+            if len(self.objects) >= MAX_ARCHIVE_ENTRIES:
+                break
+            if self.deadline and time.time() > self.deadline:
+                break
+            if m.start() < last_end:
+                continue
             start = m.end()
             pos = start
             # Skip optional single space after control word
@@ -1211,7 +1290,11 @@ class _RtfObjParser:
                 pos += 1
             hex_chars = bytearray()
             depth = 0
+            steps = 0
             while pos < n:
+                steps += 1
+                if self.deadline and (steps & 0xFFFF) == 0 and time.time() > self.deadline:
+                    break
                 ch = data[pos]
                 if ch == 0x7B:  # '{'
                     depth += 1
@@ -1244,11 +1327,13 @@ class _RtfObjParser:
                     or (0x41 <= ch <= 0x46)
                     or (0x61 <= ch <= 0x66)
                 ):
-                    hex_chars.append(ch)
+                    if len(hex_chars) < max_hex_chars:
+                        hex_chars.append(ch)
                     pos += 1
                 else:
                     pos += 1
 
+            last_end = max(last_end, pos)
             if len(hex_chars) >= 16:
                 if len(hex_chars) % 2 == 1:
                     hex_chars.pop()
@@ -1328,10 +1413,10 @@ def _pdf_ascii_hex_decode(data: bytes) -> bytes:
     end = data.find(b">")
     if end != -1:
         data = data[:end]
-    cleaned = re.sub(rb"[^0-9a-fA-F]", b"", data)
+    cleaned = re.sub(rb"[^0-9a-fA-F]", b"", data)[: MAX_DECOMPRESSED_STREAM_SIZE * 2]
     if len(cleaned) % 2 == 1:
         cleaned += b"0"
-    return binascii.unhexlify(cleaned)
+    return binascii.unhexlify(cleaned)[:MAX_DECOMPRESSED_STREAM_SIZE]
 
 
 def _pdf_ascii85_decode(data: bytes) -> bytes:
@@ -1342,12 +1427,14 @@ def _pdf_ascii85_decode(data: bytes) -> bytes:
     if end != -1:
         data = data[:end]
     try:
-        return base64.a85decode(data, adobe=False, ignorechars=b" \t\r\n\x00\x0c")
+        return base64.a85decode(data, adobe=False, ignorechars=b" \t\r\n\x00\x0c")[:MAX_DECOMPRESSED_STREAM_SIZE]
     except Exception:
         # Manual resilient ASCII85 decode for truncated streams
         out = bytearray()
         group: List[int] = []
         for b in data:
+            if len(out) >= MAX_DECOMPRESSED_STREAM_SIZE:
+                break
             if b in b" \t\r\n\x00\x0c":
                 continue
             if b == 0x7A and not group:  # 'z' -> 4 zero bytes
@@ -1360,7 +1447,7 @@ def _pdf_ascii85_decode(data: bytes) -> bytes:
                         val = val * 85 + g
                     out.extend(struct.pack(">I", val & 0xFFFFFFFF))
                     group.clear()
-        if len(group) >= 2:
+        if len(group) >= 2 and len(out) < MAX_DECOMPRESSED_STREAM_SIZE:
             rem = len(group) - 1
             while len(group) < 5:
                 group.append(84)
@@ -1368,7 +1455,7 @@ def _pdf_ascii85_decode(data: bytes) -> bytes:
             for g in group:
                 val = val * 85 + g
             out.extend(struct.pack(">I", val & 0xFFFFFFFF)[:rem])
-        return bytes(out)
+        return bytes(out[:MAX_DECOMPRESSED_STREAM_SIZE])
 
 
 def _pdf_run_length_decode(data: bytes) -> bytes:
@@ -1510,6 +1597,8 @@ def decode_pdf_stream(dict_bytes: bytes, raw_stream: bytes) -> Optional[bytes]:
 
     if not filters:
         return None
+    if len(filters) > MAX_PDF_FILTERS:
+        filters = filters[:MAX_PDF_FILTERS]
 
     predictor = 1
     columns = 1
@@ -1545,6 +1634,160 @@ def decode_pdf_stream(dict_bytes: bytes, raw_stream: bytes) -> Optional[bytes]:
     return curr
 
 
+def _find_pdf_stream_kw(doc: bytes, start: int) -> Tuple[int, int]:
+    """Locate the next PDF ``stream`` keyword followed by CR, LF, or CRLF in linear time."""
+    n = len(doc)
+    pos = start
+    while pos < n:
+        idx = doc.find(b"stream", pos)
+        if idx == -1:
+            return -1, -1
+        if idx > 0:
+            prev = doc[idx - 1]
+            if (0x41 <= prev <= 0x5A) or (0x61 <= prev <= 0x7A):
+                pos = idx + 6
+                continue
+        after = idx + 6
+        if after < n:
+            b1 = doc[after]
+            if b1 == 0x0A:
+                return idx, after + 1
+            if b1 == 0x0D:
+                if after + 1 < n and doc[after + 1] == 0x0A:
+                    return idx, after + 2
+                return idx, after + 1
+        pos = idx + 6
+    return -1, -1
+
+
+def _find_pdf_endobj_kw(doc: bytes, start: int) -> int:
+    """Locate the next PDF ``endobj`` keyword on a word boundary in linear time."""
+    n = len(doc)
+    pos = start
+    while pos < n:
+        idx = doc.find(b"endobj", pos)
+        if idx == -1:
+            return -1
+        if idx > 0:
+            prev = doc[idx - 1]
+            if (0x41 <= prev <= 0x5A) or (0x61 <= prev <= 0x7A) or (0x30 <= prev <= 0x39) or prev == 0x5F:
+                pos = idx + 6
+                continue
+        after = idx + 6
+        if after < n:
+            nxt = doc[after]
+            if (0x41 <= nxt <= 0x5A) or (0x61 <= nxt <= 0x7A) or (0x30 <= nxt <= 0x39) or nxt == 0x5F:
+                pos = idx + 6
+                continue
+        return idx
+    return -1
+
+
+def _strip_pdf_streams(doc: bytes) -> bytes:
+    """Replace PDF stream bodies with empty placeholders in linear O(N) time."""
+    out: List[bytes] = []
+    pos = 0
+    n = len(doc)
+    while pos < n:
+        s_idx, data_start = _find_pdf_stream_kw(doc, pos)
+        if s_idx == -1:
+            out.append(doc[pos:])
+            break
+        e_idx = doc.find(b"endstream", data_start)
+        if e_idx == -1:
+            out.append(doc[pos:])
+            break
+        out.append(doc[pos:s_idx])
+        out.append(b"stream\nendstream")
+        pos = e_idx + 9
+    return b"".join(out)
+
+
+def _iter_pdf_obj_streams(doc: bytes) -> Iterator[Tuple[bytes, bytes, bytes, bytes]]:
+    """Yield ``(num_bytes, gen_bytes, dict_bytes, raw_stream)`` for PDF object streams in linear O(N) time."""
+    headers = list(RE_PDF_OBJ_HEADER.finditer(doc))
+    n_headers = len(headers)
+    consumed_until = 0
+    cached_stream_pos = -2
+    cached_stream_data_start = -1
+    cached_endobj_pos = -2
+
+    for idx, m in enumerate(headers):
+        if m.start() < consumed_until:
+            continue
+        pos = m.end()
+
+        if cached_stream_pos != -1 and cached_stream_pos < pos:
+            cached_stream_pos, cached_stream_data_start = _find_pdf_stream_kw(doc, pos)
+        if cached_stream_pos == -1:
+            break
+
+        if cached_endobj_pos != -1 and cached_endobj_pos < pos:
+            cached_endobj_pos = _find_pdf_endobj_kw(doc, pos)
+
+        if cached_endobj_pos != -1 and cached_endobj_pos < cached_stream_pos:
+            continue
+
+        if idx + 1 < n_headers and headers[idx + 1].start() < cached_stream_pos:
+            if cached_stream_pos - pos > 65536:
+                continue
+
+        endstream_pos = doc.find(b"endstream", cached_stream_data_start)
+        if endstream_pos == -1:
+            break
+
+        dict_bytes = doc[pos:cached_stream_pos]
+        raw_end = endstream_pos
+        if raw_end >= cached_stream_data_start + 2 and doc[raw_end - 2 : raw_end] == b"\r\n":
+            raw_end -= 2
+        elif raw_end >= cached_stream_data_start + 1 and doc[raw_end - 1] in (0x0A, 0x0D):
+            raw_end -= 1
+        raw_stream = doc[cached_stream_data_start:raw_end]
+
+        consumed_until = endstream_pos + 9
+        yield m.group(1), m.group(2), dict_bytes, raw_stream
+
+
+def _iter_delimited_blocks(buf: bytes, start_tok: bytes, end_tok: bytes) -> List[bytes]:
+    """Extract non-overlapping slices between ``start_tok`` and ``end_tok`` in linear O(N) time."""
+    blocks: List[bytes] = []
+    pos = 0
+    s_len = len(start_tok)
+    e_len = len(end_tok)
+    while True:
+        s_idx = buf.find(start_tok, pos)
+        if s_idx == -1:
+            break
+        e_idx = buf.find(end_tok, s_idx + s_len)
+        if e_idx == -1:
+            break
+        blocks.append(buf[s_idx + s_len : e_idx])
+        pos = e_idx + e_len
+    return blocks
+
+
+def _iter_pdf_zero_gen_objects(doc: bytes) -> Iterator[Tuple[int, bytes]]:
+    """Yield ``(oid, dict_body)`` for generation-0 PDF objects in linear O(N) time."""
+    headers = list(RE_PDF_ZERO_OBJ_HEADER.finditer(doc))
+    n_headers = len(headers)
+    cached_endobj = -2
+    for idx, m in enumerate(headers):
+        pos = m.end()
+        if cached_endobj != -1 and cached_endobj < pos:
+            cached_endobj = _find_pdf_endobj_kw(doc, pos)
+        if cached_endobj == -1:
+            break
+        next_hdr = headers[idx + 1].start() if idx + 1 < n_headers else len(doc)
+        obj_end = min(cached_endobj, next_hdr, pos + 65536)
+        if obj_end <= pos:
+            continue
+        try:
+            oid = int(m.group(1))
+        except ValueError:
+            continue
+        yield oid, doc[pos:obj_end]
+
+
 def reconstruct_pdf_text(doc: bytes, decoded_streams: Dict[int, bytes]) -> bytes:
     """Reconstruct readable UTF-8 text from PDF content streams using /ToUnicode CMaps and literal strings."""
     obj_cmaps: Dict[int, Dict[Tuple[int, int], str]] = {}
@@ -1554,7 +1797,7 @@ def reconstruct_pdf_text(doc: bytes, decoded_streams: Dict[int, bytes]) -> bytes
         if b"begincmap" not in sbytes:
             continue
         cm: Dict[Tuple[int, int], str] = {}
-        for blk in re.findall(rb"beginbfchar(.*?)endbfchar", sbytes, re.S):
+        for blk in _iter_delimited_blocks(sbytes, b"beginbfchar", b"endbfchar"):
             for src, dst in re.findall(rb"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>", blk):
                 try:
                     ch = "".join(
@@ -1565,7 +1808,7 @@ def reconstruct_pdf_text(doc: bytes, decoded_streams: Dict[int, bytes]) -> bytes
                     merged_cmap.setdefault(key, ch)
                 except Exception:
                     pass
-        for blk in re.findall(rb"beginbfrange(.*?)endbfrange", sbytes, re.S):
+        for blk in _iter_delimited_blocks(sbytes, b"beginbfrange", b"endbfrange"):
             for lo, hi, dst in re.findall(
                 rb"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>", blk
             ):
@@ -1583,12 +1826,7 @@ def reconstruct_pdf_text(doc: bytes, decoded_streams: Dict[int, bytes]) -> bytes
 
     font_obj_to_cmap: Dict[int, Dict[Tuple[int, int], str]] = {}
     fn_to_cmap: Dict[str, Dict[Tuple[int, int], str]] = {}
-    for m_obj in re.finditer(rb"(\d+)\s+0\s+obj(.*?)endobj", doc, re.S):
-        try:
-            oid = int(m_obj.group(1))
-        except ValueError:
-            continue
-        body = m_obj.group(2)
+    for oid, body in _iter_pdf_zero_gen_objects(doc):
         m_tu = re.search(rb"/ToUnicode\s+(\d+)\s+0\s+R", body)
         if m_tu:
             tu_id = int(m_tu.group(1))
@@ -1615,7 +1853,7 @@ def reconstruct_pdf_text(doc: bytes, decoded_streams: Dict[int, bytes]) -> bytes
             continue
         cur_font: Optional[str] = None
         stream_parts: List[str] = []
-        for blk in re.findall(rb"BT(.*?)ET", sbytes, re.S):
+        for blk in _iter_delimited_blocks(sbytes, b"BT", b"ET"):
             out_chars: List[str] = []
             for tok in re.finditer(rb"/(F\d+)\b|\(([^\)]*)\)|<([0-9A-Fa-f]+)>", blk):
                 if tok.group(1) is not None:
@@ -1651,6 +1889,34 @@ def reconstruct_pdf_text(doc: bytes, decoded_streams: Dict[int, bytes]) -> bytes
     if not lines:
         return b""
     return "\n".join(lines).encode("utf-8", errors="replace")
+
+
+_RE_UNICODE_TAG_CHAR = re.compile(rb"\xf3\xa0([\x80\x81])([\x80-\xbf])")
+_RE_ZERO_WIDTH_OR_BIDI = re.compile(
+    rb"(?:\xe2\x80[\x8b-\x8f\xaa-\xae]|\xe2\x81[\xa0-\xa9]|\xef\xbb\xbf|\xf3\xa0[\x84-\x87][\x80-\xbf])+"
+)
+
+
+def _decode_unicode_tag_match(m: re.Match) -> bytes:
+    b2 = m.group(1)[0]
+    b3 = m.group(2)[0]
+    code = (b3 - 0x80) if b2 == 0x80 else (b3 - 0x40)
+    if 0x20 <= code <= 0x7E:
+        return bytes([code])
+    return b""
+
+
+def normalize_unicode_evasion(data: bytes) -> Optional[bytes]:
+    """Decode Unicode Plane 14 Tag characters (U+E0020..U+E007E) to ASCII and strip zero-width/BiDi bytes."""
+    if not data or len(data) > 4 * 1024 * 1024:
+        return None
+    if b"\xf3\xa0" not in data and b"\xe2\x80" not in data and b"\xe2\x81" not in data:
+        return None
+    norm = _RE_UNICODE_TAG_CHAR.sub(_decode_unicode_tag_match, data)
+    norm = _RE_ZERO_WIDTH_OR_BIDI.sub(b"", norm)
+    if norm != data and norm:
+        return norm
+    return None
 
 
 def _resolve_default_yara_path(filename: str) -> str:
@@ -1784,6 +2050,8 @@ class quicksand:
         execyara: Optional[str] = None,
         pdfyara: Optional[str] = None,
         password: Optional[str] = None,
+        max_total_bytes: int = MAX_TOTAL_EXTRACTED_BYTES,
+        max_captured_bytes: int = MAX_CAPTURED_BYTES,
     ) -> Dict[str, Dict[str, Any]]:
         """Analyze all regular files in a directory (non-recursive).
 
@@ -1797,6 +2065,8 @@ class quicksand:
             execyara: Optional path to a custom executable YARA rules file.
             pdfyara: Optional path to a custom PDF YARA rules file.
             password: Optional password for decrypting protected Office documents.
+            max_total_bytes: Cumulative extracted byte budget per file (``0`` for unlimited).
+            max_captured_bytes: Cumulative captured stream byte budget per file (``0`` for unlimited).
 
         Returns:
             Dictionary mapping each file's path string to its ``qs.results`` dictionary.
@@ -1816,6 +2086,8 @@ class quicksand:
                         execyara=execyara,
                         pdfyara=pdfyara,
                         password=password,
+                        max_total_bytes=max_total_bytes,
+                        max_captured_bytes=max_captured_bytes,
                     )
                     q.process()
                     out[str(file_path)] = q.results
@@ -1838,6 +2110,8 @@ class quicksand:
         execyara: Optional[str] = None,
         pdfyara: Optional[str] = None,
         password: Optional[str] = None,
+        max_total_bytes: int = MAX_TOTAL_EXTRACTED_BYTES,
+        max_captured_bytes: int = MAX_CAPTURED_BYTES,
     ):
         """Initialize a QuickSand document analyzer instance.
 
@@ -1851,6 +2125,8 @@ class quicksand:
             execyara: Optional override path for ``quicksand_exe.yara``.
             pdfyara: Optional override path for ``quicksand_pdf.yara``.
             password: Optional password to try when decrypting encrypted Office files.
+            max_total_bytes: Cumulative extracted byte budget across nested streams (``0`` = no limit).
+            max_captured_bytes: Maximum total bytes retained in ``results["streams"]`` (``0`` = no limit).
         """
         self.results: Dict[str, Any] = {"results": {}}
         self.structure = ""
@@ -1858,6 +2134,8 @@ class quicksand:
         self.strings = strings
         self.debug = debug
         self.password = password
+        self.max_total_bytes = max_total_bytes
+        self.max_captured_bytes = max_captured_bytes
         self.results["score"] = 0
         self.results["warning"] = 0
         self.results["exploit"] = 0
@@ -1867,6 +2145,9 @@ class quicksand:
         self.timeout = timeout
         self._matched_rules: Set[str] = set()
         self._depth: int = 0
+        self._extracted_bytes: int = 0
+        self._captured_bytes: int = 0
+        self._analyzed_streams: int = 0
 
         if self.capture:
             self.results["streams"] = {}
@@ -1892,6 +2173,12 @@ class quicksand:
         self.execrules = self._compile_yara_cached(self.execyara)
         self.pdfrules = self._compile_yara_cached(self.pdfyara)
 
+    def _deadline(self) -> Optional[float]:
+        """Return absolute epoch deadline if ``self.timeout > 0`` and ``process()`` has started."""
+        if self.timeout > 0 and "started" in self.results:
+            return float(self.results["started"]) + float(self.timeout)
+        return None
+
     def _is_timed_out(self) -> bool:
         """Check whether processing has exceeded the configured ``self.timeout``.
 
@@ -1903,6 +2190,39 @@ class quicksand:
                 self.results["skip"] = 1
                 return True
         return False
+
+    def _remaining_extract_budget(self) -> int:
+        """Return maximum bytes allowed for the next decompressed/extracted child stream."""
+        if self.max_total_bytes <= 0:
+            return MAX_DECOMPRESSED_STREAM_SIZE
+        rem = self.max_total_bytes - self._extracted_bytes
+        if rem <= 0:
+            self.results["skip"] = 1
+            return 0
+        return min(MAX_DECOMPRESSED_STREAM_SIZE, rem)
+
+    def _record_extracted(self, nbytes: int) -> bool:
+        """Account for newly extracted/decoded bytes and return ``False`` if total budget is exceeded."""
+        if nbytes > 0:
+            self._extracted_bytes += nbytes
+        if self.max_total_bytes > 0 and self._extracted_bytes > self.max_total_bytes:
+            self.results["skip"] = 1
+            return False
+        return True
+
+    def _capture_stream(self, loc: str, data: bytes) -> None:
+        """Store ``data`` in ``results["streams"][loc]`` when ``capture=True`` within memory bounds."""
+        if not self.capture or data is None:
+            return
+        key = str(loc)
+        streams = self.results.setdefault("streams", {})
+        prev_len = len(streams[key]) if key in streams else 0
+        new_total = self._captured_bytes - prev_len + len(data)
+        if self.max_captured_bytes > 0 and new_total > self.max_captured_bytes:
+            self.results["capture_truncated"] = 1
+            return
+        streams[key] = data
+        self._captured_bytes = new_total
 
     def format_yara_strings(self, match_strings: List) -> str:
         """Format YARA ``StringMatch`` objects or legacy ``(offset, identifier, data)`` tuples.
@@ -1968,10 +2288,22 @@ class quicksand:
             loc: Stream location label (e.g., ``"root-pdf_4_0"``).
             rule_type: Rule category label (``"exploit"``, ``"execute"``, or ``"pdf"``).
         """
-        if not item:
+        if not item or self._is_timed_out():
             return
         loc_str = str(loc)
-        matches = rules.match(data=item)
+        deadline = self._deadline()
+        try:
+            if deadline is not None:
+                rem = deadline - time.time()
+                if rem <= 0:
+                    self.results["skip"] = 1
+                    return
+                matches = rules.match(data=item, timeout=max(1, int(rem) + 1))
+            else:
+                matches = rules.match(data=item)
+        except yara.TimeoutError:
+            self.results["skip"] = 1
+            return
         if not matches:
             return
 
@@ -2061,12 +2393,11 @@ class quicksand:
             self.scan_pdf(doc, str(loc))
 
             # Normalize #xx hex-escaped PDF dictionary names (e.g. /#4f#70#65n#41#63t#69o#6e -> /OpenAction)
-            if re.search(rb"/[A-Za-z0-9_#]*#[4567][0-9a-fA-F]", doc):
-                stripped_pdf = re.sub(rb"stream[\r\n].*?endstream", b"stream\nendstream", doc, flags=re.S)
+            if re.search(rb"/[A-Za-z0-9_#]{0,128}#[4567][0-9a-fA-F]", doc):
+                stripped_pdf = _strip_pdf_streams(doc)
                 unescaped_pdf = RE_PDF_NAME_HEX.sub(lambda m: bytes([int(m.group(1), 16)]), stripped_pdf)
                 self.scan_pdf(unescaped_pdf, f"{loc}-pdf_unescaped")
-                if self.capture:
-                    self.results["streams"][f"{loc}-pdf_unescaped"] = unescaped_pdf
+                self._capture_stream(f"{loc}-pdf_unescaped", unescaped_pdf)
 
             for block in RE_PDF_STRUCTURE.findall(doc):
                 if len(block[2]) != 0:
@@ -2083,27 +2414,26 @@ class quicksand:
                     self.msg(f"obj {token}")
 
             decoded_streams: Dict[int, bytes] = {}
-            for m in RE_PDF_OBJ_STREAM.finditer(doc):
-                if self._is_timed_out():
+            for num_bytes, gen_bytes, dict_bytes, raw_stream in _iter_pdf_obj_streams(doc):
+                if self._is_timed_out() or self._remaining_extract_budget() <= 0:
                     break
                 try:
-                    num = int(m.group(1))
-                    gen = int(m.group(2))
+                    num = int(num_bytes)
+                    gen = int(gen_bytes)
                 except ValueError:
                     continue
 
-                dict_bytes = m.group(3)
-                raw_stream = m.group(4)
                 self.msg(f"stream {num} {gen}")
 
                 decoded = decode_pdf_stream(dict_bytes, raw_stream)
+                if decoded is not None:
+                    self._record_extracted(len(decoded))
                 stream_payload = decoded if decoded is not None else raw_stream
                 if stream_payload:
                     decoded_streams[num] = stream_payload
                     pdf_object_loc = f"{loc}-pdf_{num}_{gen}"
                     self.scan_pdf(stream_payload, pdf_object_loc)
-                    if self.capture:
-                        self.results["streams"][pdf_object_loc] = stream_payload
+                    self._capture_stream(pdf_object_loc, stream_payload)
 
                     # If this is an /EmbeddedFile stream or contains an archive/document/PE magic, analyze it
                     norm_dict = RE_PDF_NAME_HEX.sub(
@@ -2132,14 +2462,13 @@ class quicksand:
                     if text_blob:
                         text_loc = f"{loc}-pdf_text"
                         self.scan_pdf(text_blob, text_loc)
-                        if self.capture:
-                            self.results["streams"][text_loc] = text_blob
+                        self._capture_stream(text_loc, text_blob)
                 except Exception:
                     pass
 
             # Decode Base64 payloads hidden in PDF /V /<base64> name values (e.g., CVE-2026-34621)
             for b64_idx, m_b64 in enumerate(re.finditer(rb"/V\s*/([A-Za-z0-9+#=/]{100,})", doc)):
-                if self._is_timed_out():
+                if self._is_timed_out() or self._remaining_extract_budget() <= 0:
                     break
                 try:
                     raw_b64 = RE_PDF_NAME_HEX.sub(
@@ -2148,13 +2477,13 @@ class quicksand:
                     pad = (-len(raw_b64)) % 4
                     if pad:
                         raw_b64 += b"=" * pad
-                    b64_dec = base64.b64decode(raw_b64)[:MAX_DECOMPRESSED_STREAM_SIZE]
+                    b64_dec = base64.b64decode(raw_b64)[: self._remaining_extract_budget()]
+                    self._record_extracted(len(b64_dec))
                     if len(b64_dec) >= 32:
                         b64_loc = f"{loc}-pdf_v_b64_{b64_idx}"
                         self.scan_pdf(b64_dec, b64_loc)
                         self.scan_exploit(b64_dec, b64_loc)
-                        if self.capture:
-                            self.results["streams"][b64_loc] = b64_dec
+                        self._capture_stream(b64_loc, b64_dec)
                 except Exception:
                     pass
 
@@ -2183,18 +2512,20 @@ class quicksand:
                     names_blob = "\n".join(entries).encode("utf-8", errors="replace")
                     names_loc = f"{loc}-zip_filenames"
                     self.scan_exploit(names_blob, names_loc)
-                    if self.capture:
-                        self.results["streams"][names_loc] = names_blob
+                    self._capture_stream(names_loc, names_blob)
                 for name in entries:
                     if self._is_timed_out():
                         break
+                    budget = self._remaining_extract_budget()
+                    if budget <= 0:
+                        break
                     with myzipfile.open(name) as zf:
-                        subdata = zf.read(MAX_DECOMPRESSED_STREAM_SIZE)
+                        subdata = zf.read(budget)
+                    self._record_extracted(len(subdata))
                     if len(subdata) > 10:
                         stream_loc = f"{loc}-{name}"
                         self.analyze(subdata, stream_loc)
-                        if self.capture:
-                            self.results["streams"][stream_loc] = subdata
+                        self._capture_stream(stream_loc, subdata)
         except Exception as e:
             return e
         return "ok"
@@ -2204,16 +2535,16 @@ class quicksand:
     def rtf_block(self, block: bytes, loc: str) -> None:
         """Decode an RTF hex block and scan/carve embedded OLE or OpenXML objects."""
         try:
-            cleaned = RE_RTF_WHITESPACE.sub(b"", block)
+            cleaned = RE_RTF_WHITESPACE.sub(b"", block)[: MAX_DECOMPRESSED_STREAM_SIZE * 2]
             if len(cleaned) % 2 == 1:
                 cleaned = cleaned[:-1]
             obj = bytes.fromhex(cleaned.decode("ascii"))
         except Exception:
-            obj = block
+            obj = block[:MAX_DECOMPRESSED_STREAM_SIZE]
 
+        self._record_extracted(len(obj))
         self.msg(f"RTF obj size {len(obj)}")
-        if self.capture:
-            self.results["streams"][loc] = obj
+        self._capture_stream(loc, obj)
 
         self.scan_exploit(obj, str(loc))
         self.scan_exec(obj, str(loc))
@@ -2228,22 +2559,22 @@ class quicksand:
 
             directory = 0
             for i, elem in enumerate(elements):
+                if self._is_timed_out() or self._remaining_extract_budget() <= 0:
+                    break
                 newloc = f"ole{i}"
                 self.structure += f"{newloc},"
 
                 r = self.analyse_ole(elem, f"{loc}-{newloc}")
-                if self.capture:
-                    self.results["streams"][f"{loc}{newloc}"] = elem
+                self._capture_stream(f"{loc}{newloc}", elem)
 
                 if "negative" in str(r) and len(elements) > 1:
                     self.msg(f"range {directory} {i}")
                     joined = b"".join(elements[directory : i + 1])
                     r = self.analyse_ole(joined, f"{loc}-oleg{directory}-{i}")
-                    if self.capture:
-                        self.results["streams"][f"{loc}-oler{directory}-{i}"] = joined
+                    self._capture_stream(f"{loc}-oler{directory}-{i}", joined)
                     directory = i + 1
-                elif self.capture:
-                    self.results["streams"][f"{loc}-olea-{i}"] = elem
+                else:
+                    self._capture_stream(f"{loc}-olea-{i}", elem)
 
         # Carve embedded OpenXML ZIP archives
         if OPENXML_MAGIC in obj:
@@ -2254,23 +2585,23 @@ class quicksand:
 
             directory = 0
             for i, elem in enumerate(elements):
+                if self._is_timed_out() or self._remaining_extract_budget() <= 0:
+                    break
                 self.msg(elem[:64])
                 self.msg(" -element 1 ")
                 newloc = f"openxml{i}"
                 self.structure += f"{newloc},"
                 r = self.analyse_openxml(elem, f"{loc}-{newloc}")
-                if self.capture:
-                    self.results["streams"][f"{loc}{newloc}"] = elem
+                self._capture_stream(f"{loc}{newloc}", elem)
 
                 if "negative" in str(r) and len(elements) > 1:
                     self.msg(f"range {directory} {i}")
                     joined = b"".join(elements[directory : i + 1])
                     r = self.analyse_openxml(joined, f"{loc}-openxmlg{directory}-{i}")
-                    if self.capture:
-                        self.results["streams"][f"{loc}-openxmlr{directory}-{i}"] = joined
+                    self._capture_stream(f"{loc}-openxmlr{directory}-{i}", joined)
                     directory = i + 1
-                elif self.capture:
-                    self.results["streams"][f"{loc}-openxmla{i}"] = elem
+                else:
+                    self._capture_stream(f"{loc}-openxmla{i}", elem)
 
     def analyse_rtf(self, doc: bytes, loc: str) -> None:
         """Analyze RTF document and extract embedded OLE1.0, OLEPackage, ODS, and datastore streams."""
@@ -2283,20 +2614,25 @@ class quicksand:
 
         try:
             for ds, block in enumerate(RE_RTF_ODS_BLOCK.findall(doc)):
+                if self._is_timed_out() or self._remaining_extract_budget() <= 0:
+                    break
                 self.msg(f"RTF ODS size {len(block)}")
                 self.structure += f"rtfods@{ds},"
                 self.rtf_block(block, f"{loc}-rtfods@{ds}")
 
             for ds, block in enumerate(RE_RTF_DATASTORE_BLOCK.findall(doc)):
+                if self._is_timed_out() or self._remaining_extract_budget() <= 0:
+                    break
                 self.msg(f"RTF datastore size {len(block)}")
                 self.structure += f"rtfdatastore@{ds},"
                 self.rtf_block(block, f"{loc}-rtfdatastore@{ds}")
 
-            rt = _RtfObjParser(doc)
+            rt = _RtfObjParser(doc, deadline=self._deadline())
             rt.parse()
             for obj in rt.objects:
-                if self._is_timed_out():
+                if self._is_timed_out() or self._remaining_extract_budget() <= 0:
                     break
+                self._record_extracted(len(obj.rawdata))
                 orig_len = obj.end - obj.start
                 self.msg(f"RTF object size {orig_len}")
                 self.msg(obj.rawdata[:100].hex())
@@ -2326,8 +2662,7 @@ class quicksand:
                     pkg_loc = f"{loc}-rtfpkg@{obj.start}"
                     self.scan_exploit(obj.olepkgdata, pkg_loc)
                     self.scan_exec(obj.olepkgdata, pkg_loc)
-                    if self.capture:
-                        self.results["streams"][pkg_loc] = obj.olepkgdata
+                    self._capture_stream(pkg_loc, obj.olepkgdata)
                 elif obj.oledata is not None:
                     self.msg("RTFOLE DATA")
                     self.structure += f"rtfobjole@{obj.start},"
@@ -2336,11 +2671,9 @@ class quicksand:
                         raw_loc = f"{loc}-rtfobj@{obj.start}"
                         self.scan_exploit(obj.rawdata, raw_loc)
                         self.scan_exec(obj.rawdata, raw_loc)
-                        if self.capture:
-                            self.results["streams"][raw_loc] = obj.rawdata
+                        self._capture_stream(raw_loc, obj.rawdata)
                     self.analyze(obj.oledata, ole_loc)
-                    if self.capture:
-                        self.results["streams"][ole_loc] = obj.oledata
+                    self._capture_stream(ole_loc, obj.oledata)
                 else:
                     self.rtf_block(obj.rawdata, f"{loc}-rtfobj@{obj.start}")
 
@@ -2384,7 +2717,7 @@ class quicksand:
         self.scan_exec(doc, str(loc))
 
         for raw_block in RE_MSO_BASE64.findall(doc):
-            if self._is_timed_out():
+            if self._is_timed_out() or self._remaining_extract_budget() <= 0:
                 break
             # If the regex captured across a MIME header blank line (\r\n\r\n or \n\n), take the body after the blank line
             block = re.split(rb"(?:\r\n\r\n|\n\n)", raw_block)[-1].strip()
@@ -2393,46 +2726,80 @@ class quicksand:
 
             is_mso_prefix = block[:3] == b"mso"
             b64_payload = block[3:].strip() if is_mso_prefix else block
+            budget = self._remaining_extract_budget()
+            b64_payload = b64_payload[: budget * 2]
             try:
-                decoded = base64.decodebytes(b64_payload)
+                decoded = base64.decodebytes(b64_payload)[:budget]
             except Exception:
                 try:
                     cleaned = re.sub(rb"[^A-Za-z0-9+/=]", b"", b64_payload)
                     pad = (-len(cleaned)) % 4
                     if pad:
                         cleaned += b"=" * pad
-                    decoded = base64.b64decode(cleaned)
+                    decoded = base64.b64decode(cleaned)[:budget]
                 except Exception:
                     continue
 
+            self._record_extracted(len(decoded))
             am_idx = decoded.find(b"ActiveMime", 0, 64)
             if am_idx != -1:
-                dc = self.explode_gzuncompress(decoded[am_idx + 10 :])
+                dc = self.explode_gzuncompress(decoded[am_idx + 10 :])[: self._remaining_extract_budget()]
+                self._record_extracted(len(dc))
                 suffix = "-mso-activemime" if is_mso_prefix else "-b64-activemime"
                 stream_loc = f"{loc}{suffix}"
                 self.analyze(dc, stream_loc)
-                if self.capture:
-                    self.results["streams"][stream_loc] = dc
+                self._capture_stream(stream_loc, dc)
             else:
                 suffix = "-mso" if is_mso_prefix else "-b64"
                 stream_loc = f"{loc}{suffix}"
                 self.analyze(decoded, stream_loc)
-                if self.capture:
-                    self.results["streams"][stream_loc] = decoded
+                self._capture_stream(stream_loc, decoded)
 
     analyze_mso = analyse_mso
+
+    @staticmethod
+    def _extract_ps_hex_blocks(doc: bytes) -> List[bytes]:
+        """Extract whitespace-bounded hex blocks of length >= 64 without regex backtracking."""
+        blocks: List[bytes] = []
+        n = len(doc)
+        ws = b"\x0a\x0d\x20\x09"
+        for m in RE_PS_HEX_RUN.finditer(doc):
+            s, e = m.start(), m.end()
+            seg = m.group(0)
+            if s > 0 and doc[s - 1] not in ws:
+                first_ws = -1
+                for idx, b in enumerate(seg):
+                    if b in ws:
+                        first_ws = idx
+                        break
+                if first_ws == -1:
+                    continue
+                seg = seg[first_ws + 1 :]
+            if e < n and doc[e] not in ws:
+                last_ws = -1
+                for idx in range(len(seg) - 1, -1, -1):
+                    if seg[idx] in ws:
+                        last_ws = idx
+                        break
+                if last_ws == -1:
+                    continue
+                seg = seg[:last_ws]
+            if len(seg) >= 64:
+                blocks.append(seg)
+        return blocks
 
     def analyse_ps(self, doc: bytes, loc: str) -> None:
         """Analyze PostScript documents and decode hex-encoded payloads."""
         self.scan_exploit(doc, str(loc))
         self.scan_exec(doc, str(loc))
 
-        candidates = RE_PS_HEX_STRING.findall(doc) + RE_PS_HEX_BLOCK.findall(doc)
+        candidates = RE_PS_HEX_STRING.findall(doc) + self._extract_ps_hex_blocks(doc)
         i = 0
-        for block in candidates:
-            if self._is_timed_out():
+        for block in candidates[:MAX_ARCHIVE_ENTRIES]:
+            if self._is_timed_out() or self._remaining_extract_budget() <= 0:
                 break
-            cleaned = re.sub(rb"[^0-9a-fA-F]", b"", block)
+            budget = self._remaining_extract_budget()
+            cleaned = re.sub(rb"[^0-9a-fA-F]", b"", block)[: budget * 2]
             if len(cleaned) < 32:
                 continue
             if len(cleaned) % 2 == 1:
@@ -2441,12 +2808,12 @@ class quicksand:
                 obj = bytes.fromhex(cleaned.decode("ascii"))
             except ValueError:
                 continue
+            self._record_extracted(len(obj))
             self.scan_exploit(obj, str(loc))
             self.scan_exec(obj, str(loc))
             stream_loc = f"{loc}-pshex{i}"
             self.analyze(obj, stream_loc)
-            if self.capture:
-                self.results["streams"][stream_loc] = obj
+            self._capture_stream(stream_loc, obj)
             i += 1
 
     analyze_ps = analyse_ps
@@ -2475,8 +2842,13 @@ class quicksand:
             if is_ole_encrypted(ole):
                 try:
                     self.msg("ole file is encrypted")
-                    decrypted_doc = decrypt_ole_document(ole, password=self.password)
+                    decrypted_doc = decrypt_ole_document(
+                        ole,
+                        password=self.password,
+                        deadline=self._deadline(),
+                    )
                     if decrypted_doc is not None:
+                        self._record_extracted(len(decrypted_doc))
                         self.msg("ole file decrypted")
                         myloc = f"{loc}-oledecrypted"
                         self.structure += "oledecrypted"
@@ -2518,14 +2890,15 @@ class quicksand:
                         }
                     )
 
-            for stream_idx, name in enumerate(ole.listdir(streams=True, storages=False)):
-                if self._is_timed_out():
+            for stream_idx, name in enumerate(ole.listdir(streams=True, storages=False)[:MAX_ARCHIVE_ENTRIES]):
+                if self._is_timed_out() or self._remaining_extract_budget() <= 0:
                     break
                 self.msg(f"OLE Stream {name}")
                 name0 = name[0] if isinstance(name, list) and name else str(name)
                 try:
                     stream = ole.openstream(name)
-                    s = stream.read()
+                    s = stream.read(self._remaining_extract_budget())
+                    self._record_extracted(len(s))
 
                     if isinstance(name, list):
                         joined_name = "-".join(name)
@@ -2539,6 +2912,7 @@ class quicksand:
                         unc = self.explode_gfinflate(s)
                         if len(unc) > len(s):
                             self.msg("DECOMPRESSED ZLIB STREAM")
+                            self._record_extracted(len(unc))
                             s = unc
 
                     # Check for VBA macro streams in Word ('Macros'), Excel ('_VBA_PROJECT_CUR'), or any 'VBA' storage
@@ -2551,6 +2925,7 @@ class quicksand:
                             unc = decompress_vba_stream(s)
                             if len(unc) > 0:
                                 self.msg("DECOMPRESSED Macro success")
+                                self._record_extracted(len(unc))
                                 # Scan raw stream first (catches p-code stomping) before replacing with decompressed source
                                 self.scan_exploit(s, f"{myloc}-raw")
                                 self.scan_exec(s, f"{myloc}-raw")
@@ -2563,10 +2938,10 @@ class quicksand:
                         try:
                             unc_rtf = decompress_rtf_lzfu(s)
                             if unc_rtf:
+                                self._record_extracted(len(unc_rtf))
                                 lzfu_loc = f"{myloc}-lzfu"
                                 self.analyze(unc_rtf, lzfu_loc)
-                                if self.capture:
-                                    self.results["streams"][lzfu_loc] = unc_rtf
+                                self._capture_stream(lzfu_loc, unc_rtf)
                         except Exception:
                             pass
 
@@ -2576,38 +2951,43 @@ class quicksand:
                             elements.pop(0)
                         directory = 0
                         for i, elem in enumerate(elements):
+                            if self._is_timed_out() or self._remaining_extract_budget() <= 0:
+                                break
                             r = self.analyse_openxml(elem, f"{loc}-{name0}-openxml{i}")
                             if "negative" in str(r):
                                 joined = b"".join(elements[directory : i + 1])
                                 r = self.analyse_openxml(joined, f"{loc}-{name0}-openxml{directory}-{i}")
                                 directory = i + 1
-                                if self.capture:
-                                    self.results["streams"][f"{loc}-{name0}-openxml{directory}-{i}"] = joined
-                            elif self.capture:
-                                self.results["streams"][f"{loc}-{name0}-openxml{i}"] = elem
+                                self._capture_stream(f"{loc}-{name0}-openxml{directory}-{i}", joined)
+                            else:
+                                self._capture_stream(f"{loc}-{name0}-openxml{i}", elem)
 
                     if ZLIB_HEADER_MAGIC in s:
                         elements = self.carve(s, ZLIB_HEADER_MAGIC)
                         if elements:
                             elements.pop(0)
                         for element in elements:
+                            if self._is_timed_out() or self._remaining_extract_budget() <= 0:
+                                break
                             dc = self.explode_gzuncompress(element)
+                            self._record_extracted(len(dc))
                             gz_loc = f"{loc}-{name0}-gzinflate"
                             self.analyze(dc, gz_loc)
-                            if self.capture:
-                                self.results["streams"][gz_loc] = dc
+                            self._capture_stream(gz_loc, dc)
 
                     if PPT_ATOM_MAGIC in s:
                         elements = self.carve(s, PPT_ATOM_MAGIC)
                         if elements:
                             elements.pop(0)
                         for element in elements:
+                            if self._is_timed_out() or self._remaining_extract_budget() <= 0:
+                                break
                             try:
                                 dc = self.explode_gfinflate(element)
+                                self._record_extracted(len(dc))
                                 atom_loc = f"{loc}-{name0}-atom"
                                 self.analyze(dc, atom_loc)
-                                if self.capture:
-                                    self.results["streams"][atom_loc] = dc
+                                self._capture_stream(atom_loc, dc)
                             except Exception as e:
                                 self.msg(e)
 
@@ -2615,15 +2995,13 @@ class quicksand:
                         if len(s) > 100 and is_ole_file(s):
                             nested_loc = f"{loc}-{name0}-ole{stream_idx}"
                             self.analyse_ole(s, nested_loc)
-                            if self.capture:
-                                self.results["streams"][nested_loc] = s
+                            self._capture_stream(nested_loc, s)
                     except Exception:
                         pass
 
                     self.scan_exploit(s, myloc)
                     self.scan_exec(s, myloc)
-                    if self.capture:
-                        self.results["streams"][str(myloc)] = s
+                    self._capture_stream(str(myloc), s)
 
                     if name0 in ("Workbook", "Book"):
                         self.msg("Excel workbook calling BIFF")
@@ -2632,8 +3010,7 @@ class quicksand:
                             macro_text = "\n".join(macro).encode("utf-8", errors="replace")
                             biff_loc = f"{myloc}-biff"
                             self.scan_exploit(macro_text, biff_loc)
-                            if self.capture:
-                                self.results["streams"][biff_loc] = macro_text
+                            self._capture_stream(biff_loc, macro_text)
 
                 except Exception as e:
                     self.msg(e)
@@ -2651,15 +3028,16 @@ class quicksand:
                 elements.pop(0)
             directory = 0
             for i, elem in enumerate(elements):
+                if self._is_timed_out() or self._remaining_extract_budget() <= 0:
+                    break
                 r = self.analyse_openxml(elem, f"{loc}-openxml{i}")
                 if "negative" in str(r):
                     joined = b"".join(elements[directory : i + 1])
                     r = self.analyse_openxml(joined, f"{loc}openxml-{directory}-{i}")
                     directory = i + 1
-                    if self.capture:
-                        self.results["streams"][f"{loc}openxml-{directory}-{i}"] = joined
-                elif self.capture:
-                    self.results["streams"][f"{loc}-openxml{i}"] = elem
+                    self._capture_stream(f"{loc}openxml-{directory}-{i}", joined)
+                else:
+                    self._capture_stream(f"{loc}-openxml{i}", elem)
 
         return "ok"
 
@@ -2745,6 +3123,10 @@ class quicksand:
         """
         if self._is_timed_out() or self._depth > MAX_NESTING_DEPTH:
             return
+        self._analyzed_streams += 1
+        if self._analyzed_streams > MAX_TOTAL_STREAMS:
+            self.results["skip"] = 1
+            return
         self._depth += 1
         try:
             doc_type = self.check_header(doc)
@@ -2770,15 +3152,20 @@ class quicksand:
                 self.scan_exploit(doc, loc)
                 self.scan_exec(doc, loc)
                 # Decompress zlib-compressed Shockwave Flash (CWS) streams
-                if len(doc) > 8 and doc[:3] == b"CWS":
+                if len(doc) > 8 and doc[:3] == b"CWS" and self._remaining_extract_budget() > 0:
                     swf_body = self.explode_gzuncompress(doc[8:90] + doc[90:]) if len(doc) > 90 else self.explode_gzuncompress(doc[8:])
                     if swf_body:
-                        swf_unc = b"FWS" + doc[3:8] + swf_body
+                        swf_unc = (b"FWS" + doc[3:8] + swf_body)[: self._remaining_extract_budget()]
+                        self._record_extracted(len(swf_unc))
                         swf_loc = f"{loc}-swf_decompressed"
                         self.scan_exploit(swf_unc, swf_loc)
                         self.scan_exec(swf_unc, swf_loc)
-                        if self.capture:
-                            self.results["streams"][swf_loc] = swf_unc
+                        self._capture_stream(swf_loc, swf_unc)
+            norm_doc = normalize_unicode_evasion(doc)
+            if norm_doc:
+                norm_loc = f"{loc}-unicode_normalized"
+                self.scan_exploit(norm_doc, norm_loc)
+                self._capture_stream(norm_loc, norm_doc)
         finally:
             self._depth -= 1
 
@@ -2902,9 +3289,13 @@ def save_streams(streams: Dict[str, bytes], output_dir: Path, prefix: str = "") 
         output_dir: Destination directory ``Path``.
         prefix: Optional filename prefix (e.g., ``"<md5>_"`` when scanning a directory).
     """
+    safe_prefix = re.sub(r"[^a-zA-Z0-9-_]", "_", str(prefix))[:64]
     for item, content in streams.items():
         safe_name = re.sub(r"[^a-zA-Z0-9-_]", "_", str(item))
-        file_path = output_dir / f"{prefix}{safe_name}"
+        if len(safe_name) > 160:
+            digest = hashlib.md5(safe_name.encode("utf-8", errors="replace")).hexdigest()[:12]
+            safe_name = f"{safe_name[:145]}_{digest}"
+        file_path = output_dir / f"{safe_prefix}{safe_name}"
         with open(file_path, "wb") as f:
             f.write(content if isinstance(content, bytes) else str(content).encode("utf-8", errors="replace"))
 
