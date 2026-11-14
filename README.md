@@ -6,7 +6,7 @@ QuickSand is a fast, self-contained Python analysis framework for analyzing susp
 
 QuickSand uses **native Python standard-library binary parsers** inside a single module (`src/quicksand/quicksand.py`) paired with **YARA** signatures (`yara-python>=4.3.0` is the only external dependency).
 
-A hosted version is available to try without any installation at [scan.tylabs.com](https://scan.tylabs.com/).
+A hosted version, developer REST API, and MCP server (`malwaretracker-mcp`) are available at [malwaretracker.com](https://malwaretracker.com/).
 
 ---
 
@@ -228,7 +228,7 @@ To prevent double-counting when the same content appears in both a raw stream an
 | `2` | `high risk active content` / `risk of exploit` | Embedded executable (`execute >= 1`), single low-rank exploit indicator, or cumulative warning `score >= 6` |
 | `3` | `high risk of exploit` | Confirmed exploit with `score >= 10`, multiple distinct exploits (`exploit >= 2`), or executable paired with exploit/high warning score |
 
-For more details on interpreting results, see [scan.tylabs.com/howto](https://scan.tylabs.com/howto).
+For live interactive scanning, REST API access, and MCP server integration, visit [malwaretracker.com](https://malwaretracker.com/) ([API & MCP docs](https://malwaretracker.com/api.html)).
 
 ---
 

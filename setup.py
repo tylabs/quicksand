@@ -19,6 +19,8 @@ setuptools.setup(
     },
     keywords=['document', 'malware', 'forensics', 'yara', 'parser'],
     project_urls={
+        "Online Scanner": "https://malwaretracker.com/",
+        "API & MCP Docs": "https://malwaretracker.com/api.html",
         "Bug Tracker": "https://github.com/tylabs/quicksand/issues",
     },
     classifiers=[
