@@ -43,7 +43,16 @@ function doReport(r) {
 	out += "md5:&nbsp;" + r['md5'] + "<br>";
 	out += "sha1:&nbsp;" + r['sha1'] + "<br>";
 	out += "sha256:&nbsp;" + r['sha256'] + "<br>";
-	out += "size:&nbsp;" + r['size'] + "</P>";
+	out += "size:&nbsp;" + r['size'];
+	if (typeof r['cart'] == "object" && r['cart'] !== null) {
+		if (typeof r['cart']['name'] == "string" && r['cart']['name'] !== "") {
+			out += "<br>cart_name:&nbsp;" + baseName(r['cart']['name'].replace(/(<([^>]+)>)/ig,""));
+		}
+		if (typeof r['cart']['payload_sha256'] == "string") {
+			out += "<br>payload_sha256:&nbsp;" + r['cart']['payload_sha256'];
+		}
+	}
+	out += "</P>";
 	out += "<p>started:&nbsp;" + r['started'] + "<br>";
 	out += "finished:&nbsp;" + r['finished'] + "<br>";
 	out += "elapsed:&nbsp;" + r['elapsed'] + "<br>";
@@ -199,6 +208,9 @@ function process() {
 	var url = "https://api.tylabs.com/put/gravel?rerun=1&uuid=" + uuid;
 	if (typeof get('rerun') != "undefined" && get('rerun') == "1") {
 		url += "&rerun=1";
+	}
+	if (typeof get('password') != "undefined" && get('password') !== "") {
+		url += "&password=" + encodeURIComponent(get('password'));
 	}
 	oReq.open("GET", url);
 	oReq.send();

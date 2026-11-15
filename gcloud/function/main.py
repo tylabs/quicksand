@@ -385,6 +385,8 @@ def handle_analyze(request):
     file_uuid = request.args.get("uuid", "").strip()
     rerun_arg = request.args.get("rerun", "").lower()
     rerun = rerun_arg in ("true", "1")
+    raw_password = request.args.get("password")
+    password = raw_password[:256] if isinstance(raw_password, str) and raw_password != "" else None
 
     if not file_uuid:
         resp = jsonify({"error": "uuid query parameter is missing"})
@@ -409,21 +411,27 @@ def handle_analyze(request):
     sha256 = hashlib.sha256(data).hexdigest()
     sha512 = hashlib.sha512(data).hexdigest()
 
-    if rerun:
-        print(f"RERUN MODE: Forcing fresh scan, bypassing cache for {sha256}")
+    if rerun or password is not None:
+        print(f"FRESH SCAN MODE: Bypassing cache for {sha256} (rerun={rerun}, password_supplied={password is not None})")
     elif check_report_recent(sha256):
         print(f"getting cached report for {sha256}")
         report = get_report(sha256)
         if report:
-            resp = Response(report, mimetype="application/json")
-            resp.headers.extend(get_cors_headers())
-            return resp
+            try:
+                cached_obj = json.loads(report)
+            except Exception:
+                cached_obj = {}
+            if not cached_obj.get("encrypted_unreadable"):
+                resp = Response(report, mimetype="application/json")
+                resp.headers.extend(get_cors_headers())
+                return resp
+            print(f"Cached report for {sha256} was encrypted_unreadable; proceeding to re-run analysis.")
         else:
             print(f"check_report_recent was true, but get_report failed for {sha256}, proceeding to re-run analysis.")
 
     print(f"{time.time()} qs start for {sha256} (fresh scan)")
     try:
-        qs = quicksand(data, timeout=18, strings=True, capture=False)
+        qs = quicksand(data, timeout=18, strings=True, capture=False, password=password)
         print(f"{time.time()} qs process start")
         qs.process()
         print(f"{time.time()} qs process end")
@@ -440,7 +448,10 @@ def handle_analyze(request):
         rt = json.dumps(processed_results, cls=BytesDump)
         print(f"{time.time()} qs end convert to json")
 
-        cache_report(md5, sha1, sha256, sha512, rt)
+        if not qs.results.get("encrypted_unreadable"):
+            cache_report(md5, sha1, sha256, sha512, rt)
+        else:
+            print(f"Skipping report cache for {sha256}: container is encrypted and unreadable.")
 
         resp = Response(rt, mimetype="application/json")
         resp.headers.extend(get_cors_headers())

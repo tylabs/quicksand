@@ -120,6 +120,8 @@ def lambda_handler(event, context):
     file_uuid = (params.get("uuid") or "").strip()
     rerun_arg = str(params.get("rerun") or "").lower()
     rerun = rerun_arg in ("1", "true")
+    raw_password = params.get("password")
+    password = raw_password[:256] if isinstance(raw_password, str) and raw_password != "" else None
 
     if not file_uuid:
         return {
@@ -147,22 +149,28 @@ def lambda_handler(event, context):
         sha256 = hashlib.sha256(data).hexdigest()
         sha512 = hashlib.sha512(data).hexdigest()
 
-        if not rerun and (checkReportRecent(sha256) or checkReportRecent(md5)):
+        if not rerun and password is None and (checkReportRecent(sha256) or checkReportRecent(md5)):
             lookup_hash = sha256 if checkReportRecent(sha256) else md5
             print("getting cached report for " + str(lookup_hash))
             report = getReport(lookup_hash)
             if report:
-                return {
-                    "statusCode": 200,
-                    "body": report,
-                }
+                try:
+                    cached_obj = json.loads(report)
+                except Exception:
+                    cached_obj = {}
+                if not cached_obj.get("encrypted_unreadable"):
+                    return {
+                        "statusCode": 200,
+                        "body": report,
+                    }
+                print("cached report for " + str(lookup_hash) + " was encrypted_unreadable; re-running")
         else:
             print("no cached report for " + str(sha256))
 
         # the default timeout is 29 seconds for a lambda run over API gateway so we time everything
         print(str(time.time()) + " qs start")
 
-        qs = quicksand(data, timeout=18, strings=True, capture=False)
+        qs = quicksand(data, timeout=18, strings=True, capture=False, password=password)
         print(str(time.time()) + " qs process")
 
         qs.process()
@@ -180,7 +188,10 @@ def lambda_handler(event, context):
         rt = json.dumps(processed_results, cls=BytesDump)
         print(str(time.time()) + " qs end convert")
 
-        cacheReport(md5, sha1, sha256, sha512, rt)
+        if not qs.results.get("encrypted_unreadable"):
+            cacheReport(md5, sha1, sha256, sha512, rt)
+        else:
+            print("skipping cache for encrypted_unreadable container " + str(sha256))
         return {
             "statusCode": 200,
             "body": rt,

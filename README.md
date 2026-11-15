@@ -18,7 +18,8 @@ A hosted version, developer REST API, and MCP server (`malwaretracker-mcp`) are 
 - **Encrypted Office Documents (`[MS-OFFCRYPTO]`)**: Built-in detection and in-memory decryption of ECMA-376 Standard Encryption (AES-128/192/256 & CryptoAPI RC4) and Agile Encryption (XML v4.4) using user-supplied passwords and common malware passwords (such as `VelvetSweatshop`).
 - **Rich Text Format (RTF)**: Native extraction of `\objdata`, `ods`, and `datastore` hex streams, OLE 1.0 objects (e.g., Equation Editor `Equation.3`), trailing `\objdata` presentation streams (`CVE-2025-21298`), and `OLEPackage` embedded files (with resilience against RTF control-word obfuscation).
 - **PDF Documents**: Native stream parser and filter pipeline supporting `/FlateDecode` (including PNG row predictors 10–15), `/ASCIIHexDecode`, `/ASCII85Decode`, `/LZWDecode`, `/RunLengthDecode`, `#xx` hex-escaped dictionary/filter names, `/EmbeddedFile` recursive scanning, Widget `/V` Base64 payload decoding (`CVE-2026-34621`), and PDF 1.5+ `/ObjStm` compressed object streams.
-- **OpenXML / ZIP / Archive Containers**: Extraction and recursive analysis of `.docx`, `.xlsx`, `.pptx`, embedded archives, ZIP entry filename manifests (`CVE-2023-38831`, `CVE-2025-59689`), WinRAR ADS path traversal (`CVE-2025-8088`), relationships (`oleObject`, `aFChunk`, external templates), and ActiveX controls.
+- **OpenXML / ZIP / Archive Containers**: Extraction and recursive analysis of `.docx`, `.xlsx`, `.pptx`, embedded archives, password-protected ZIPs (both legacy PKWARE `ZipCrypto` and WinZip `AES-128/192/256` / `WZ_AES` using `-p` and built-in malware passwords like `infected` and `infected1`), ZIP entry filename manifests (`CVE-2023-38831`, `CVE-2025-59689`), WinRAR ADS path traversal (`CVE-2025-8088`), relationships (`oleObject`, `aFChunk`, external templates), and ActiveX controls.
+- **CybercentreCanada CaRT (`.cart`)**: Native, zero-dependency unpacking and recursive analysis of neutered malware transport containers (both default RC4 key and custom `-p` / Base64 RC4 keys), including extraction of embedded JSON header/footer metadata and unpacked payload hashes.
 - **MIME / MHT / ActiveMime / WordML (`mso`)**: Base64 decoding and zlib inflation of `ActiveMime` headers and embedded payloads.
 - **PostScript (`ps`), OneNote (`.one`), Flash (`CWS`/`FWS`), & Windows Shell (`.lnk`, `.library-ms`, `.settingcontent-ms`)**: Hex/zlib payload extraction and embedded script, deserialization, NTLM coercion, and executable detection.
 
@@ -101,9 +102,10 @@ usage: quicksand [-h] [--version] [-v] [-c] [-y] [-t SECONDS] [-p PASSWORD]
                  [-a FILE]
                  document
 
-QuickSand v2.3.1 - Document and PDF malware analysis tool.
+QuickSand v2.3.2 - Document and PDF malware analysis tool.
 Scans nested streams inside Office (OLE2, OpenXML, RTF, VBA, XLM), PDF,
-MIME/ActiveMime, PostScript, and OneNote files using YARA signatures.
+ZIP (including ZipCrypto & WinZip AES passwords), CaRT (.cart), MIME/ActiveMime,
+PostScript, and OneNote files using YARA signatures.
 
 positional arguments:
   document              path to a document file or directory of documents to
@@ -122,7 +124,8 @@ analysis & extraction options:
                         per-file analysis timeout in seconds (default: 0 =
                         unlimited)
   -p PASSWORD, --password PASSWORD
-                        password for decrypting protected Office documents
+                        password for decrypting protected Office documents,
+                        ZIP archives, and CaRT files
   -d DIR, --dropdir DIR
                         directory to write extracted binary streams to
                         (implies --capture)
@@ -145,6 +148,8 @@ examples:
   quicksand suspicious.doc
   quicksand -f txt -y invoice.pdf
   quicksand -p VelvetSweatshop encrypted.xls
+  quicksand -p infected1 sample.zip
+  quicksand sample.doc.cart
   quicksand -d extracted_streams/ -o report.json samples_dir/
 ```
 
@@ -210,7 +215,7 @@ Returns a dictionary mapping `{filepath: qs.results, ...}`.
 - `strings` (`bool`, default `True`): Include matched YARA string offsets and previews in `results["results"]`.
 - `debug` (`bool`, default `False`): Print debug trace messages during parsing.
 - `timeout` (`int`, default `0`): Maximum processing time in seconds (`0` for unlimited).
-- `password` (`str`, default `None`): Password to try when decrypting password-protected Office documents (tried before the built-in default password list).
+- `password` (`str` or `Sequence[str]`, default `None`): Password(s) to try when decrypting password-protected Office documents, ZIP archives (`ZipCrypto` & `WZ_AES`), and custom-key CaRT containers (tried before the built-in default password lists).
 - `exploityara`, `execyara`, `pdfyara` (`str`, default `None`): Custom paths to override the bundled YARA rule files.
 
 ---

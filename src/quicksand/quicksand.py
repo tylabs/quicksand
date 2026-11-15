@@ -14,7 +14,8 @@ standard-library parsers for:
     - Rich Text Format (RTF) OLE 1.0 objects and OLEPackage embedded files
     - PDF streams (/FlateDecode with PNG predictors, /ASCIIHexDecode,
       /ASCII85Decode, /LZWDecode, /RunLengthDecode, and /ObjStm)
-    - OpenXML (.docx, .xlsx, .pptx) and ZIP containers
+    - OpenXML (.docx, .xlsx, .pptx) and ZIP containers (including ZipCrypto & WinZip AES passwords)
+    - CybercentreCanada CaRT (.cart) neutered malware transport containers
     - MSO / ActiveMime / MIME / WordML and PostScript documents
 
 Copyright (c) 2026 @tylabs (https://github.com/tylabs/quicksand)
@@ -24,8 +25,10 @@ License: MIT
 import argparse
 import base64
 import binascii
+import bz2
 import datetime
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -39,7 +42,7 @@ import zipfile
 import zlib
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 
 import yara
 
@@ -69,6 +72,7 @@ MAX_PDF_FILTERS = 8                              # Max chained PDF /Filter stage
 MAX_PDF_PREDICTOR_COLUMNS = 65536                # Max PNG predictor row width in bytes
 MAX_AGILE_SPIN_COUNT = 250000                    # Max ECMA-376 Agile KDF iterations (standard is 100,000)
 MAX_PURE_PYTHON_AES_BYTES = 4 * 1024 * 1024      # Max ciphertext decrypted via pure-Python AES fallback
+MAX_CART_META_SIZE = 1024 * 1024                 # Max CaRT optional JSON header/footer size (1 MB)
 
 
 # =====================================================================
@@ -82,6 +86,11 @@ OPENXML_MAGIC_SHORT = b"\x50\x4b\x03\x04\x14\x00"
 ZIP_MAGIC = b"PK\x03\x04"
 ZLIB_HEADER_MAGIC = b"\x00\x00\x78\x9c"
 PPT_ATOM_MAGIC = b"\x10\x00\x11\x10"
+CART_MAGIC = b"CART"
+TRAC_MAGIC = b"TRAC"
+CART_MANDATORY_HEADER_FMT = "<4shQ16sQ"
+CART_MANDATORY_FOOTER_FMT = "<4sQQQ"
+CART_DEFAULT_KEY = b"\x03\x01\x04\x01\x05\x09\x02\x06" * 2  # First 8 digits of pi repeated twice
 
 RE_RTF_HEADER = re.compile(rb"\\\\rt", re.IGNORECASE)
 RE_PDF_HEADER = re.compile(rb"%PDF", re.IGNORECASE)
@@ -120,35 +129,83 @@ RE_PS_HEX_RUN = re.compile(rb"[0-9a-fA-F\x0a\x0d\x20\x09]{64,}")
 
 DEFAULT_OFFICE_PASSWORDS = [
     "VelvetSweatshop",
+    "infected",
+    "infected1",
     "123456",
     "password",
     "1234",
     "",
 ]
 
+DEFAULT_ARCHIVE_PASSWORDS = [
+    "infected",
+    "infected1",
+    "malware",
+    "virus",
+    "quarantine",
+    "clean",
+    "password",
+    "1234",
+    "123456",
+    "VelvetSweatshop",
+]
 
-def _rc4(key: bytes, data: bytes) -> bytes:
-    """Pure-Python RC4 stream cipher."""
+
+def _iter_candidate_passwords(
+    password: Optional[Union[str, Sequence[str]]],
+    defaults: Sequence[str],
+) -> List[str]:
+    """Build a deduplicated password trial list with caller-supplied password(s) first."""
+    candidates: List[str] = []
+    if isinstance(password, str):
+        candidates.append(password)
+    elif password is not None:
+        for pw in password:
+            if isinstance(pw, str) and pw not in candidates:
+                candidates.append(pw)
+    for pw in defaults:
+        if pw not in candidates:
+            candidates.append(pw)
+    return candidates
+
+
+def _rc4_init(key: bytes) -> List[int]:
+    """Initialize 256-byte RC4 permutation state."""
     s = list(range(256))
-    j = 0
     key_len = len(key)
     if key_len == 0:
-        return data
+        return s
+    j = 0
     for i in range(256):
         j = (j + s[i] + key[i % key_len]) & 0xFF
         s[i], s[j] = s[j], s[i]
-    i = 0
-    j = 0
+    return s
+
+
+def _rc4_crypt_stateful(s: List[int], i: int, j: int, data: bytes) -> Tuple[bytes, int, int]:
+    """Encrypt/decrypt a chunk using mutable RC4 state ``s`` and indices ``(i, j)``."""
     out = bytearray(len(data))
     for idx, byte in enumerate(data):
         i = (i + 1) & 0xFF
-        j = (j + s[i]) & 0xFF
-        s[i], s[j] = s[j], s[i]
-        out[idx] = byte ^ s[(s[i] + s[j]) & 0xFF]
-    return bytes(out)
+        si = s[i]
+        j = (j + si) & 0xFF
+        sj = s[j]
+        s[i] = sj
+        s[j] = si
+        out[idx] = byte ^ s[(si + sj) & 0xFF]
+    return bytes(out), i, j
 
 
-# Pure-Python AES implementation (supports AES-128, AES-192, AES-256 ECB & CBC)
+def _rc4(key: bytes, data: bytes) -> bytes:
+    """Pure-Python RC4 stream cipher."""
+    if not key or not data:
+        return data
+    s = _rc4_init(key)
+    out, _, _ = _rc4_crypt_stateful(s, 0, 0, data)
+    return out
+
+
+# Pure-Python AES implementation (supports AES-128, AES-192, AES-256 ECB, CBC & WinZip CTR)
 _AES_SBOX = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
     0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
@@ -186,6 +243,8 @@ def _gmul(a: int, b: int) -> int:
     return p
 
 
+_MUL2 = [_gmul(i, 2) for i in range(256)]
+_MUL3 = [_gmul(i, 3) for i in range(256)]
 _MUL9 = [_gmul(i, 9) for i in range(256)]
 _MUL11 = [_gmul(i, 11) for i in range(256)]
 _MUL13 = [_gmul(i, 13) for i in range(256)]
@@ -222,6 +281,36 @@ def _aes_expand_key(key: bytes) -> List[List[int]]:
         rk_bytes = struct.pack(">4I", *w[r * 4 : (r + 1) * 4])
         round_keys.append(list(rk_bytes))
     return round_keys
+
+
+def _aes_encrypt_block(block: bytes, round_keys: List[List[int]]) -> bytes:
+    nr = len(round_keys) - 1
+    s = [block[i] ^ round_keys[0][i] for i in range(16)]
+    for r in range(1, nr):
+        # SubBytes + ShiftRows
+        s = [
+            _AES_SBOX[s[0]], _AES_SBOX[s[5]], _AES_SBOX[s[10]], _AES_SBOX[s[15]],
+            _AES_SBOX[s[4]], _AES_SBOX[s[9]], _AES_SBOX[s[14]], _AES_SBOX[s[3]],
+            _AES_SBOX[s[8]], _AES_SBOX[s[13]], _AES_SBOX[s[2]], _AES_SBOX[s[7]],
+            _AES_SBOX[s[12]], _AES_SBOX[s[1]], _AES_SBOX[s[6]], _AES_SBOX[s[11]],
+        ]
+        # MixColumns
+        rk = round_keys[r]
+        for c in range(0, 16, 4):
+            a0, a1, a2, a3 = s[c], s[c + 1], s[c + 2], s[c + 3]
+            s[c] = _MUL2[a0] ^ _MUL3[a1] ^ a2 ^ a3 ^ rk[c]
+            s[c + 1] = a0 ^ _MUL2[a1] ^ _MUL3[a2] ^ a3 ^ rk[c + 1]
+            s[c + 2] = a0 ^ a1 ^ _MUL2[a2] ^ _MUL3[a3] ^ rk[c + 2]
+            s[c + 3] = _MUL3[a0] ^ a1 ^ a2 ^ _MUL2[a3] ^ rk[c + 3]
+    # Final round
+    s = [
+        _AES_SBOX[s[0]], _AES_SBOX[s[5]], _AES_SBOX[s[10]], _AES_SBOX[s[15]],
+        _AES_SBOX[s[4]], _AES_SBOX[s[9]], _AES_SBOX[s[14]], _AES_SBOX[s[3]],
+        _AES_SBOX[s[8]], _AES_SBOX[s[13]], _AES_SBOX[s[2]], _AES_SBOX[s[7]],
+        _AES_SBOX[s[12]], _AES_SBOX[s[1]], _AES_SBOX[s[6]], _AES_SBOX[s[11]],
+    ]
+    rk_last = round_keys[nr]
+    return bytes(s[i] ^ rk_last[i] for i in range(16))
 
 
 def _aes_decrypt_block(block: bytes, round_keys: List[List[int]]) -> bytes:
@@ -291,6 +380,51 @@ def _aes_cbc_decrypt(key: bytes, iv: bytes, data: bytes, deadline: Optional[floa
         dec = _aes_decrypt_block(blk, rks)
         out.extend(dec[i] ^ prev[i] for i in range(16))
         prev = blk
+    return bytes(out)
+
+
+def _aes_ctr_le_crypt(
+    key: bytes,
+    data: bytes,
+    start_counter: int = 1,
+    deadline: Optional[float] = None,
+) -> Optional[bytes]:
+    """WinZip AES CTR stream cipher (128-bit little-endian counter starting at ``start_counter``).
+
+    Returns ``None`` if ``deadline`` expires mid-decryption.
+    """
+    if not data:
+        return b""
+    total_len = len(data)
+    if _HAS_CRYPTOGRAPHY and len(key) in (16, 24, 32):
+        encryptor = _CryptoCipher(_crypto_algorithms.AES(key), _crypto_modes.ECB()).encryptor()
+        out = bytearray()
+        ctr = start_counter
+        chunk_size = 65536
+        for offset in range(0, total_len, chunk_size):
+            if deadline and time.time() > deadline:
+                return None
+            ct_chunk = data[offset : offset + chunk_size]
+            clen = len(ct_chunk)
+            n_blocks = (clen + 15) // 16
+            ctr_blocks = b"".join(c.to_bytes(16, "little") for c in range(ctr, ctr + n_blocks))
+            ctr += n_blocks
+            ks = encryptor.update(ctr_blocks)
+            xored = int.from_bytes(ct_chunk, "little") ^ int.from_bytes(ks[:clen], "little")
+            out.extend(xored.to_bytes(clen, "little"))
+        encryptor.finalize()
+        return bytes(out)
+
+    rks = _aes_expand_key(key)
+    out = bytearray()
+    ctr = start_counter
+    for blk_idx, offset in enumerate(range(0, total_len, 16)):
+        if deadline and (blk_idx & 0x3FF) == 0 and time.time() > deadline:
+            return None
+        ks_blk = _aes_encrypt_block(ctr.to_bytes(16, "little"), rks)
+        ctr += 1
+        ct_blk = data[offset : offset + 16]
+        out.extend(ct_blk[i] ^ ks_blk[i] for i in range(len(ct_blk)))
     return bytes(out)
 
 
@@ -1081,16 +1215,11 @@ def _decrypt_agile_ecma376(
 
 def decrypt_ole_document(
     ole: _OleFile,
-    password: Optional[str] = None,
+    password: Optional[Union[str, Sequence[str]]] = None,
     deadline: Optional[float] = None,
 ) -> Optional[bytes]:
     """Attempt to decrypt an encrypted Office OLE container using supplied and default passwords."""
-    passwords: List[str] = []
-    if password is not None:
-        passwords.append(password)
-    for pw in DEFAULT_OFFICE_PASSWORDS:
-        if pw not in passwords:
-            passwords.append(pw)
+    passwords = _iter_candidate_passwords(password, DEFAULT_OFFICE_PASSWORDS)
 
     stream_names = {p[-1].lower(): p for p in ole.listdir()}
     if "encryptioninfo" in stream_names and "encryptedpackage" in stream_names:
@@ -1953,6 +2082,372 @@ def _resolve_default_yara_path(filename: str) -> str:
 
 
 # =====================================================================
+# Native CybercentreCanada CaRT (.cart) & Encrypted ZIP Parsers
+# =====================================================================
+
+_CART_HEADER_SIZE = struct.calcsize(CART_MANDATORY_HEADER_FMT)  # 38 bytes
+_CART_FOOTER_SIZE = struct.calcsize(CART_MANDATORY_FOOTER_FMT)  # 28 bytes
+
+
+def is_cart_file(data: bytes) -> bool:
+    """Return True if ``data`` begins with a valid 38-byte CaRT v1 mandatory header."""
+    if len(data) < _CART_HEADER_SIZE or data[:4] != CART_MAGIC:
+        return False
+    try:
+        magic, version, reserved, _key, opt_header_len = struct.unpack_from(
+            CART_MANDATORY_HEADER_FMT, data, 0
+        )
+    except struct.error:
+        return False
+    if magic != CART_MAGIC or version != 1 or reserved != 0:
+        return False
+    return 0 <= opt_header_len <= min(MAX_CART_META_SIZE, len(data) - _CART_HEADER_SIZE)
+
+
+def _iter_cart_keys(
+    header_key: bytes,
+    password: Optional[Union[str, Sequence[str]]],
+) -> List[bytes]:
+    """Build candidate RC4 keys for unpacking a CaRT container."""
+    keys: List[bytes] = []
+
+    def _add(k: bytes) -> None:
+        if k and k not in keys:
+            keys.append(k)
+
+    def _add_password_variants(pw: str) -> None:
+        if not pw:
+            return
+        pw_utf8 = pw.encode("utf-8")
+        _add(pw_utf8)
+        if len(pw_utf8) < 16:
+            _add(pw_utf8 + b"\x00" * (16 - len(pw_utf8)))
+        # Support `cart -k <base64_key>` style keys passed via -p/--password
+        try:
+            b64_raw = base64.b64decode(pw, validate=True)
+            if b64_raw:
+                if len(b64_raw) < 16:
+                    _add(b64_raw + b"\x00" * (16 - len(b64_raw)))
+                _add(b64_raw)
+        except Exception:
+            pass
+
+    if header_key != b"\x00" * 16:
+        _add(header_key)
+        if password is not None:
+            for pw in _iter_candidate_passwords(password, ()):
+                _add_password_variants(pw)
+        return keys
+
+    # Custom key mode (mandatory header stores 16 null bytes)
+    for pw in _iter_candidate_passwords(password, DEFAULT_ARCHIVE_PASSWORDS):
+        _add_password_variants(pw)
+    _add(CART_DEFAULT_KEY)
+    return keys
+
+
+def unpack_cart(
+    data: bytes,
+    password: Optional[Union[str, Sequence[str]]] = None,
+    max_output: int = MAX_DECOMPRESSED_STREAM_SIZE,
+    deadline: Optional[float] = None,
+) -> Tuple[Optional[bytes], Dict[str, Any], Dict[str, Any], str]:
+    """Unpack a CybercentreCanada CaRT container in memory with anti-DoS bounds.
+
+    Returns:
+        ``(payload, optional_header, optional_footer, status)`` where ``status`` is
+        ``"ok"``, ``"encrypted_unreadable"``, or ``"corrupted"``.
+    """
+    if not is_cart_file(data):
+        return None, {}, {}, "corrupted"
+
+    _magic, _ver, _res, header_key, opt_header_len = struct.unpack_from(
+        CART_MANDATORY_HEADER_FMT, data, 0
+    )
+    opt_header_crypt = data[_CART_HEADER_SIZE : _CART_HEADER_SIZE + opt_header_len]
+    data_start = _CART_HEADER_SIZE + opt_header_len
+
+    has_valid_footer = False
+    opt_footer_crypt = b""
+    data_end = len(data)
+    if len(data) >= data_start + _CART_FOOTER_SIZE:
+        footer_off = len(data) - _CART_FOOTER_SIZE
+        t_magic, t_res, opt_footer_pos, opt_footer_len = struct.unpack_from(
+            CART_MANDATORY_FOOTER_FMT, data, footer_off
+        )
+        if (
+            t_magic == TRAC_MAGIC
+            and t_res == 0
+            and opt_footer_len <= MAX_CART_META_SIZE
+            and data_start <= opt_footer_pos == footer_off - opt_footer_len
+        ):
+            has_valid_footer = True
+            data_end = opt_footer_pos
+            if opt_footer_len > 0:
+                opt_footer_crypt = data[opt_footer_pos:footer_off]
+
+    candidate_keys = _iter_cart_keys(header_key, password)
+    custom_key_mode = header_key == b"\x00" * 16
+
+    for arc4_key in candidate_keys:
+        if deadline and time.time() > deadline:
+            break
+
+        opt_header: Dict[str, Any] = {}
+        if opt_header_len > 0:
+            try:
+                dec_hdr = _rc4(arc4_key, opt_header_crypt)
+                parsed_hdr = json.loads(dec_hdr.decode("utf-8"))
+                if not isinstance(parsed_hdr, dict):
+                    continue
+                opt_header = parsed_hdr
+            except Exception:
+                continue
+
+        opt_footer: Dict[str, Any] = {}
+        if has_valid_footer and opt_footer_crypt:
+            try:
+                dec_ftr = _rc4(arc4_key, opt_footer_crypt)
+                parsed_ftr = json.loads(dec_ftr.decode("utf-8"))
+                if not isinstance(parsed_ftr, dict):
+                    continue
+                opt_footer = parsed_ftr
+            except Exception:
+                continue
+
+        # Stream-decrypt RC4 + zlib decompress in 64 KB chunks within max_output budget
+        s = _rc4_init(arc4_key)
+        rc4_i = 0
+        rc4_j = 0
+        dobj = zlib.decompressobj()
+        out = bytearray()
+        decompress_ok = True
+        for offset in range(data_start, data_end, 65536):
+            if deadline and time.time() > deadline:
+                break
+            rem = max_output - len(out)
+            if rem <= 0:
+                break
+            crypt_chunk = data[offset : min(data_end, offset + 65536)]
+            zchunk, rc4_i, rc4_j = _rc4_crypt_stateful(s, rc4_i, rc4_j, crypt_chunk)
+            try:
+                dec_chunk = dobj.decompress(zchunk, rem)
+            except zlib.error:
+                decompress_ok = False
+                break
+            if dec_chunk:
+                out.extend(dec_chunk)
+            if dobj.eof or len(out) >= max_output:
+                break
+
+        if not decompress_ok:
+            continue
+
+        rem = max_output - len(out)
+        if rem > 0 and not dobj.eof:
+            try:
+                out.extend(dobj.flush(rem))
+            except zlib.error:
+                continue
+
+        # If neither optional header nor footer validated the key, require clean zlib stream completion or output
+        if custom_key_mode and not opt_header and not opt_footer:
+            if not dobj.eof and len(out) < max_output:
+                continue
+
+        # Recover footer from trailing unused bytes if mandatory footer wasn't pre-parsed
+        if not has_valid_footer and dobj.unused_data and len(dobj.unused_data) >= _CART_FOOTER_SIZE:
+            pass
+
+        was_truncated = len(out) >= max_output and (bool(dobj.unconsumed_tail) or not dobj.eof)
+        return bytes(out), opt_header, opt_footer, ("ok_truncated" if was_truncated else "ok")
+
+    if custom_key_mode:
+        return None, {}, {}, "encrypted_unreadable"
+    return None, {}, {}, "corrupted"
+
+
+def _parse_winzip_aes_extra(extra: bytes) -> Optional[Tuple[int, int, int]]:
+    """Parse WinZip AES extra field ``0x9901`` -> ``(ae_version, strength, actual_compress_type)``."""
+    pos = 0
+    n = len(extra)
+    while pos + 4 <= n:
+        ext_id, ext_len = struct.unpack_from("<HH", extra, pos)
+        pos += 4
+        if pos + ext_len > n:
+            break
+        if ext_id == 0x9901 and ext_len >= 7:
+            ae_ver, vendor, strength, actual_method = struct.unpack_from("<H2sBH", extra, pos)
+            if vendor == b"AE" and ae_ver in (1, 2) and strength in (1, 2, 3):
+                return ae_ver, strength, actual_method
+        pos += ext_len
+    return None
+
+
+def _encode_zip_password_variants(pw: str) -> List[bytes]:
+    """Encode a password string to candidate byte encodings for ZIP decryption."""
+    utf8_b = pw.encode("utf-8")
+    variants = [utf8_b]
+    if not pw.isascii():
+        for enc in ("cp437", "latin-1"):
+            try:
+                alt = pw.encode(enc)
+                if alt not in variants:
+                    variants.append(alt)
+            except UnicodeEncodeError:
+                pass
+    return variants
+
+
+def _extract_winzip_aes_entry(
+    doc: bytes,
+    zinfo: zipfile.ZipInfo,
+    passwords: Sequence[str],
+    budget: int,
+    deadline: Optional[float] = None,
+) -> Tuple[Optional[bytes], Optional[str], str]:
+    """Decrypt and decompress a WinZip AE-1/AE-2 (method 99) encrypted ZIP entry."""
+    lh_off = zinfo.header_offset
+    if lh_off < 0 or lh_off + 30 > len(doc) or doc[lh_off : lh_off + 4] != ZIP_MAGIC:
+        return None, None, "corrupted"
+
+    fname_len, local_extra_len = struct.unpack_from("<HH", doc, lh_off + 26)
+    extra_start = lh_off + 30 + fname_len
+    data_start = extra_start + local_extra_len
+    data_end = data_start + zinfo.compress_size
+    if data_end > len(doc) or extra_start > len(doc):
+        return None, None, "corrupted"
+
+    ae_meta = _parse_winzip_aes_extra(zinfo.extra)
+    if ae_meta is None:
+        ae_meta = _parse_winzip_aes_extra(doc[extra_start:data_start])
+    if ae_meta is None:
+        return None, None, "corrupted"
+
+    ae_version, strength, actual_method = ae_meta
+    salt_len = {1: 8, 2: 12, 3: 16}[strength]
+    key_len = {1: 16, 2: 24, 3: 32}[strength]
+    overhead = salt_len + 2 + 10
+    if zinfo.compress_size < overhead:
+        return None, None, "corrupted"
+
+    raw_entry = doc[data_start:data_end]
+    salt = raw_entry[:salt_len]
+    pwd_verify = raw_entry[salt_len : salt_len + 2]
+    ciphertext = raw_entry[salt_len + 2 : len(raw_entry) - 10]
+    expected_mac = raw_entry[len(raw_entry) - 10 :]
+
+    for pw in passwords:
+        if deadline and time.time() > deadline:
+            return None, None, "timeout"
+        for pw_bytes in _encode_zip_password_variants(pw):
+            dk = hashlib.pbkdf2_hmac("sha1", pw_bytes, salt, 1000, 2 * key_len + 2)
+            if dk[2 * key_len : 2 * key_len + 2] != pwd_verify:
+                continue
+            aes_key = dk[:key_len]
+            auth_key = dk[key_len : 2 * key_len]
+            calc_mac = hmac.new(auth_key, ciphertext, hashlib.sha1).digest()[:10]
+            if not hmac.compare_digest(calc_mac, expected_mac):
+                continue
+
+            max_ct = len(ciphertext) if _HAS_CRYPTOGRAPHY else min(len(ciphertext), MAX_PURE_PYTHON_AES_BYTES)
+            ct_bounded = ciphertext[:max_ct]
+
+            if actual_method == 0:  # ZIP_STORED
+                pt = _aes_ctr_le_crypt(
+                    aes_key,
+                    ct_bounded[: min(len(ct_bounded), budget)],
+                    start_counter=1,
+                    deadline=deadline,
+                )
+                if pt is None:
+                    return None, None, "timeout"
+                if ae_version == 1 and len(pt) == zinfo.file_size == len(ciphertext):
+                    if (zlib.crc32(pt) & 0xFFFFFFFF) != zinfo.CRC:
+                        return None, None, "corrupted"
+                return pt, pw, "ok"
+
+            if actual_method in (8, 12):  # ZIP_DEFLATED or ZIP_BZIP2
+                dobj: Any = (
+                    zlib.decompressobj(-zlib.MAX_WBITS)
+                    if actual_method == 8
+                    else bz2.BZ2Decompressor()
+                )
+                out = bytearray()
+                ctr = 1
+                chunk_sz = 65536
+                for offset in range(0, len(ct_bounded), chunk_sz):
+                    rem = budget - len(out)
+                    if rem <= 0:
+                        break
+                    ct_chunk = ct_bounded[offset : offset + chunk_sz]
+                    pt_chunk = _aes_ctr_le_crypt(aes_key, ct_chunk, start_counter=ctr, deadline=deadline)
+                    if pt_chunk is None:
+                        return None, None, "timeout"
+                    ctr += (len(ct_chunk) + 15) // 16
+                    try:
+                        dec = (
+                            dobj.decompress(pt_chunk, rem)
+                            if actual_method == 8
+                            else dobj.decompress(pt_chunk, max_length=rem)
+                        )
+                    except Exception:
+                        return None, None, "corrupted"
+                    if dec:
+                        out.extend(dec)
+                    if getattr(dobj, "eof", False) or len(out) >= budget:
+                        break
+                if actual_method == 8 and len(out) < budget and not dobj.eof:
+                    try:
+                        out.extend(dobj.flush(budget - len(out)))
+                    except Exception:
+                        pass
+                res_bytes = bytes(out[:budget])
+                if (
+                    ae_version == 1
+                    and len(ct_bounded) == len(ciphertext)
+                    and len(res_bytes) == zinfo.file_size
+                    and zinfo.file_size < budget
+                ):
+                    if (zlib.crc32(res_bytes) & 0xFFFFFFFF) != zinfo.CRC:
+                        return None, None, "corrupted"
+                return res_bytes, pw, "ok"
+
+            return None, None, "unsupported_method"
+
+    return None, None, "encrypted_unreadable"
+
+
+def _extract_zipcrypto_entry(
+    myzipfile: zipfile.ZipFile,
+    zinfo: zipfile.ZipInfo,
+    passwords: Sequence[str],
+    budget: int,
+    deadline: Optional[float] = None,
+) -> Tuple[Optional[bytes], Optional[str], str]:
+    """Decrypt and decompress a legacy PKWARE ZipCrypto encrypted ZIP entry."""
+    for pw in passwords:
+        if deadline and time.time() > deadline:
+            return None, None, "timeout"
+        for pw_bytes in _encode_zip_password_variants(pw):
+            try:
+                with myzipfile.open(zinfo, pwd=pw_bytes) as zf:
+                    if zinfo.file_size <= budget:
+                        # Reading 1 byte past file_size reaches EOF so zipfile validates full 32-bit CRC-32
+                        data = zf.read(budget + 1)[:budget]
+                    else:
+                        data = zf.read(budget)
+                return data, pw, "ok"
+            except NotImplementedError:
+                return None, None, "unsupported_method"
+            except (RuntimeError, zipfile.BadZipFile, zlib.error, EOFError):
+                continue
+            except Exception:
+                continue
+    return None, None, "encrypted_unreadable"
+
+
+# =====================================================================
 # Main QuickSand Class
 # =====================================================================
 
@@ -1982,7 +2477,7 @@ class quicksand:
         >>> print(qs.results["risk"], qs.results["score"])
     """
 
-    __version__ = "2.3.1"
+    __version__ = "2.3.2"
     __author__ = "tylabs.com"
     __copyright__ = "Copyright 2026, @tylabs"
     __license__ = "MIT"
@@ -2049,7 +2544,7 @@ class quicksand:
         exploityara: Optional[str] = None,
         execyara: Optional[str] = None,
         pdfyara: Optional[str] = None,
-        password: Optional[str] = None,
+        password: Optional[Union[str, Sequence[str]]] = None,
         max_total_bytes: int = MAX_TOTAL_EXTRACTED_BYTES,
         max_captured_bytes: int = MAX_CAPTURED_BYTES,
     ) -> Dict[str, Dict[str, Any]]:
@@ -2064,7 +2559,8 @@ class quicksand:
             exploityara: Optional path to a custom exploit YARA rules file.
             execyara: Optional path to a custom executable YARA rules file.
             pdfyara: Optional path to a custom PDF YARA rules file.
-            password: Optional password for decrypting protected Office documents.
+            password: Optional password (or sequence of passwords) for decrypting
+                protected Office documents, ZIP archives, and custom-key CaRT files.
             max_total_bytes: Cumulative extracted byte budget per file (``0`` for unlimited).
             max_captured_bytes: Cumulative captured stream byte budget per file (``0`` for unlimited).
 
@@ -2109,7 +2605,7 @@ class quicksand:
         exploityara: Optional[str] = None,
         execyara: Optional[str] = None,
         pdfyara: Optional[str] = None,
-        password: Optional[str] = None,
+        password: Optional[Union[str, Sequence[str]]] = None,
         max_total_bytes: int = MAX_TOTAL_EXTRACTED_BYTES,
         max_captured_bytes: int = MAX_CAPTURED_BYTES,
     ):
@@ -2124,7 +2620,8 @@ class quicksand:
             exploityara: Optional override path for ``quicksand_exploits.yara``.
             execyara: Optional override path for ``quicksand_exe.yara``.
             pdfyara: Optional override path for ``quicksand_pdf.yara``.
-            password: Optional password to try when decrypting encrypted Office files.
+            password: Optional password (or sequence of passwords) to try when decrypting
+                encrypted Office files, ZIP archives, and custom-key CaRT containers.
             max_total_bytes: Cumulative extracted byte budget across nested streams (``0`` = no limit).
             max_captured_bytes: Maximum total bytes retained in ``results["streams"]`` (``0`` = no limit).
         """
@@ -2223,6 +2720,25 @@ class quicksand:
             return
         streams[key] = data
         self._captured_bytes = new_total
+
+    def _record_encrypted_unreadable(self, loc: str, desc: str, strings_info: str = "") -> None:
+        """Record a structural warning when an encrypted archive or container cannot be unlocked."""
+        self.results["encrypted_unreadable"] = True
+        rule_name = "archive_encrypted_unreadable"
+        if rule_name not in self._matched_rules:
+            self._matched_rules.add(rule_name)
+            self.results["warning"] += 1
+            self.results["feature"] += 1
+            self.results["score"] += 1
+        entry: Dict[str, Any] = {
+            "rule": rule_name,
+            "desc": desc,
+            "type": "structure",
+            "mitre": "T1027 T1027.013",
+        }
+        if self.strings:
+            entry["strings"] = strings_info
+        self.results["results"].setdefault(str(loc), []).append(entry)
 
     def format_yara_strings(self, match_strings: List) -> str:
         """Format YARA ``StringMatch`` objects or legacy ``(offset, identifier, data)`` tuples.
@@ -2440,7 +2956,7 @@ class quicksand:
                         lambda hx: bytes([int(hx.group(1), 16)]), dict_bytes
                     )
                     if b"/EmbeddedFile" in norm_dict or stream_payload.startswith(
-                        (b"Rar!", b"PK\x03\x04", b"MZ", b"\xd0\xcf\x11\xe0", b"{\\rtf")
+                        (b"Rar!", b"PK\x03\x04", b"MZ", b"\xd0\xcf\x11\xe0", b"{\\rtf", b"CART\x01\x00")
                     ):
                         self.scan_exploit(stream_payload, pdf_object_loc)
                         self.scan_exec(stream_payload, pdf_object_loc)
@@ -2502,30 +3018,200 @@ class quicksand:
 
     analyze_pdf = analyse_pdf
 
+    def analyse_cart(self, doc: bytes, loc: str) -> str:
+        """Unpack and analyze a CybercentreCanada CaRT (.cart) container."""
+        budget = self._remaining_extract_budget()
+        if budget <= 0:
+            return "budget_exceeded"
+
+        payload, opt_header, opt_footer, status = unpack_cart(
+            doc,
+            password=self.password,
+            max_output=budget,
+            deadline=self._deadline(),
+        )
+        if status == "encrypted_unreadable":
+            self._record_encrypted_unreadable(
+                loc,
+                "WARNING: CaRT container uses a custom RC4 key and could not be decrypted",
+                strings_info="custom_rc4_key",
+            )
+            return status
+
+        if status not in ("ok", "ok_truncated") or payload is None:
+            entry: Dict[str, Any] = {
+                "rule": "cart_malformed",
+                "desc": "WARNING: CaRT container is malformed or truncated and could not be unpacked",
+                "type": "structure",
+            }
+            if self.strings:
+                entry["strings"] = ""
+            self.results["results"].setdefault(str(loc), []).append(entry)
+            return status
+
+        if status == "ok_truncated":
+            self.results["skip"] = 1
+        self._record_extracted(len(payload))
+        cart_meta: Dict[str, Any] = {
+            "header": opt_header,
+            "footer": opt_footer,
+            "payload_md5": hashlib.md5(payload).hexdigest(),
+            "payload_sha1": hashlib.sha1(payload).hexdigest(),
+            "payload_sha256": hashlib.sha256(payload).hexdigest(),
+            "payload_size": len(payload),
+        }
+        embedded_name = opt_header.get("name")
+        if isinstance(embedded_name, str) and embedded_name:
+            cart_meta["name"] = embedded_name
+            name_bytes = embedded_name.encode("utf-8", errors="replace")
+            name_loc = f"{loc}-cart_filename"
+            self.scan_exploit(name_bytes, name_loc)
+            self._capture_stream(name_loc, name_bytes)
+
+        if loc == "root":
+            self.results["cart"] = cart_meta
+        else:
+            self.results.setdefault("cart_streams", {})[str(loc)] = cart_meta
+
+        inner_loc = (
+            f"{loc}-cart-{embedded_name}"
+            if isinstance(embedded_name, str) and embedded_name
+            else f"{loc}-cart"
+        )
+        self.analyze(payload, inner_loc)
+        self._capture_stream(inner_loc, payload)
+        return "ok"
+
+    analyze_cart = analyse_cart
+
     def analyse_openxml(self, doc: bytes, loc: str) -> Union[str, Exception]:
-        """Extract and analyze streams inside an OpenXML / ZIP archive."""
+        """Extract and analyze streams inside an OpenXML / ZIP archive (including password-protected ZIPs)."""
         try:
             filebytes = BytesIO(doc)
             with zipfile.ZipFile(filebytes, allowZip64=True) as myzipfile:
-                entries = myzipfile.namelist()[:MAX_ARCHIVE_ENTRIES]
+                infolist = myzipfile.infolist()[:MAX_ARCHIVE_ENTRIES]
+                entries = [zi.filename for zi in infolist]
                 if entries:
                     names_blob = "\n".join(entries).encode("utf-8", errors="replace")
                     names_loc = f"{loc}-zip_filenames"
                     self.scan_exploit(names_blob, names_loc)
                     self._capture_stream(names_loc, names_blob)
-                for name in entries:
+
+                is_openxml_pkg = "[Content_Types].xml" in entries
+                has_encrypted_entries = any(
+                    not zi.is_dir() and ((zi.flag_bits & 0x1) != 0 or zi.compress_type == 99)
+                    for zi in infolist
+                )
+                track_archive_entries = (not is_openxml_pkg) or has_encrypted_entries
+
+                base_passwords = (
+                    _iter_candidate_passwords(self.password, DEFAULT_ARCHIVE_PASSWORDS)
+                    if has_encrypted_entries
+                    else []
+                )
+                working_password: Optional[str] = None
+                archive_records: List[Dict[str, Any]] = []
+
+                for zinfo in infolist:
                     if self._is_timed_out():
                         break
                     budget = self._remaining_extract_budget()
                     if budget <= 0:
                         break
-                    with myzipfile.open(name) as zf:
-                        subdata = zf.read(budget)
-                    self._record_extracted(len(subdata))
-                    if len(subdata) > 10:
-                        stream_loc = f"{loc}-{name}"
-                        self.analyze(subdata, stream_loc)
-                        self._capture_stream(stream_loc, subdata)
+                    name = zinfo.filename
+                    is_encrypted = bool(zinfo.flag_bits & 0x1) or zinfo.compress_type == 99
+
+                    if not is_encrypted:
+                        if zinfo.is_dir():
+                            continue
+                        try:
+                            with myzipfile.open(zinfo) as zf:
+                                subdata = zf.read(budget)
+                        except NotImplementedError:
+                            continue
+                        self._record_extracted(len(subdata))
+                        if track_archive_entries:
+                            archive_records.append(
+                                {
+                                    "filename": name,
+                                    "md5": hashlib.md5(subdata).hexdigest(),
+                                    "sha1": hashlib.sha1(subdata).hexdigest(),
+                                    "sha256": hashlib.sha256(subdata).hexdigest(),
+                                    "size": len(subdata),
+                                    "encrypted": False,
+                                    "decrypted": True,
+                                }
+                            )
+                        if len(subdata) > 10:
+                            stream_loc = f"{loc}-{name}"
+                            self.analyze(subdata, stream_loc)
+                            self._capture_stream(stream_loc, subdata)
+                        continue
+
+                    if zinfo.is_dir():
+                        continue
+
+                    pw_candidates = (
+                        [working_password] + [p for p in base_passwords if p != working_password]
+                        if working_password is not None
+                        else base_passwords
+                    )
+                    deadline = self._deadline()
+
+                    if zinfo.compress_type == 99:
+                        dec_data, matched_pw, status = _extract_winzip_aes_entry(
+                            doc, zinfo, pw_candidates, budget, deadline=deadline
+                        )
+                    else:
+                        dec_data, matched_pw, status = _extract_zipcrypto_entry(
+                            myzipfile, zinfo, pw_candidates, budget, deadline=deadline
+                        )
+
+                    if status == "ok" and dec_data is not None:
+                        if matched_pw is not None:
+                            working_password = matched_pw
+                        self.results["archive_decrypted"] = True
+                        if zinfo.file_size > budget:
+                            self.results["skip"] = 1
+                        self._record_extracted(len(dec_data))
+                        archive_records.append(
+                            {
+                                "filename": name,
+                                "md5": hashlib.md5(dec_data).hexdigest(),
+                                "sha1": hashlib.sha1(dec_data).hexdigest(),
+                                "sha256": hashlib.sha256(dec_data).hexdigest(),
+                                "size": len(dec_data),
+                                "encrypted": True,
+                                "decrypted": True,
+                            }
+                        )
+                        if len(dec_data) > 0:
+                            stream_loc = f"{loc}-{name}"
+                            self.analyze(dec_data, stream_loc)
+                            self._capture_stream(stream_loc, dec_data)
+                    elif status == "timeout":
+                        self.results["skip"] = 1
+                        break
+                    else:
+                        archive_records.append(
+                            {
+                                "filename": name,
+                                "size": zinfo.file_size,
+                                "encrypted": True,
+                                "decrypted": False,
+                            }
+                        )
+                        self._record_encrypted_unreadable(
+                            loc,
+                            f"WARNING: password-protected ZIP entry '{name}' could not be decrypted",
+                            strings_info=name,
+                        )
+
+                if archive_records:
+                    if loc == "root":
+                        self.results["archive_entries"] = archive_records
+                    else:
+                        self.results.setdefault("nested_archive_entries", {})[str(loc)] = archive_records
         except Exception as e:
             return e
         return "ok"
@@ -2854,7 +3540,9 @@ class quicksand:
                         self.structure += "oledecrypted"
                         self.analyze(decrypted_doc, myloc)
                         return "ok"
+                    self.results["encrypted_unreadable"] = True
                 except Exception as e:
+                    self.results["encrypted_unreadable"] = True
                     self.msg(e)
                     self.msg(traceback.format_exc())
 
@@ -3138,6 +3826,8 @@ class quicksand:
 
             if doc_type == "ole":
                 self.analyse_ole(doc, loc)
+            elif doc_type == "cart":
+                self.analyse_cart(doc, loc)
             elif doc_type in ("openxml", "zip"):
                 self.analyse_openxml(doc, loc)
             elif doc_type == "rtf":
@@ -3179,7 +3869,7 @@ class quicksand:
             doc: Raw document or stream bytes.
 
         Returns:
-            Format identifier string: ``"rtf"``, ``"ole"``, ``"openxml"``,
+            Format identifier string: ``"rtf"``, ``"ole"``, ``"cart"``, ``"openxml"``,
             ``"zip"``, ``"pdf"``, ``"xdp"``, ``"mso"``, ``"ps"``, or ``"data"``.
         """
         if not doc:
@@ -3190,6 +3880,8 @@ class quicksand:
             return "rtf"
         elif doc[:4] == OLE_MAGIC_SHORT:
             return "ole"
+        elif is_cart_file(doc):
+            return "cart"
         elif OPENXML_MAGIC_SHORT in doc:
             return "openxml"
         elif doc[:2] == b"PK":
@@ -3266,7 +3958,16 @@ def txt_out(results: Dict[str, Any]) -> str:
     out += f"{'md5':<20}: {results['md5']}\n"
     out += f"{'sha1':<20}: {results['sha1']}\n"
     out += f"{'sha256':<20}: {results['sha256']}\n"
-    out += f"{'size':<20}: {results['size']}\n\n"
+    out += f"{'size':<20}: {results['size']}\n"
+    if isinstance(results.get("cart"), dict):
+        cart_info = results["cart"]
+        if cart_info.get("name"):
+            out += f"{'cart_name':<20}: {cart_info['name']}\n"
+        if cart_info.get("payload_sha256"):
+            out += f"{'payload_sha256':<20}: {cart_info['payload_sha256']}\n"
+    if results.get("encrypted_unreadable"):
+        out += f"{'encrypted_locked':<20}: True\n"
+    out += "\n"
     out += f"{'started':<20}: {results['started']}\n"
     out += f"{'finished':<20}: {results['finished']}\n"
     out += f"{'elapsed':<20}: {results['elapsed']}\n"
@@ -3413,6 +4114,8 @@ def main(args: Optional[List[str]] = None) -> argparse.Namespace:
         "  quicksand suspicious.doc\n"
         "  quicksand -f txt -y invoice.pdf\n"
         "  quicksand -p VelvetSweatshop encrypted.xls\n"
+        "  quicksand -p infected1 sample.zip\n"
+        "  quicksand sample.doc.cart\n"
         "  quicksand -d extracted_streams/ -o report.json samples_dir/\n"
     )
     parser = argparse.ArgumentParser(
@@ -3420,7 +4123,8 @@ def main(args: Optional[List[str]] = None) -> argparse.Namespace:
         description=(
             f"QuickSand v{quicksand.__version__} - Document and PDF malware analysis tool.\n"
             "Scans nested streams inside Office (OLE2, OpenXML, RTF, VBA, XLM), PDF,\n"
-            "MIME/ActiveMime, PostScript, and OneNote files using YARA signatures."
+            "ZIP (including ZipCrypto & WinZip AES passwords), CaRT (.cart), MIME/ActiveMime,\n"
+            "PostScript, and OneNote files using YARA signatures."
         ),
         epilog=epilog,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -3461,7 +4165,7 @@ def main(args: Optional[List[str]] = None) -> argparse.Namespace:
     )
     scan_group.add_argument(
         "-p", "--password",
-        help="password for decrypting protected Office documents",
+        help="password for decrypting protected Office documents, ZIP archives, and CaRT files",
         default=None,
         type=str,
         metavar="PASSWORD",
