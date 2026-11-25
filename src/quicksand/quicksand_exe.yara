@@ -237,8 +237,8 @@ rule executable_unhandled_compression {
 	    $rar_magic_v1 = { 52 61 72 21 1A 07 00 } // RAR 1.50 onwards
 	    $rar_magic_v2 = { 52 61 72 21 1A 07 01 00 } // RAR 5.00 onwards
 	
-	    // .gz / .gzip (GNU Zip)
-	    $gz_magic = { 1F 8B }
+	    // .gz / .gzip (GNU Zip deflate header)
+	    $gz_magic = { 1F 8B 08 }
 	
 	    // .bzip2 (BZip2)
 	    $bzip2_magic = { 42 5A 68 } // "BZh"

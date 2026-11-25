@@ -1093,7 +1093,10 @@ rule suspicious_flash_Adobe_Shockwave_Flash_in_a_PDF_define_obj_type {
 		desc = "suspicious.flash Adobe Shockwave Flash in a PDF define obj type"
 		mitre = "T1204.002"
 	strings:
-		$h_hex1 = { (52|233532) (69|233639) (63|233633) (68|233638) (4D|233444|233464) (65|233635) (64|233634) (69|233639)(61|233631) }
+		$h_hex1a = /\/#52(i|#69)(c|#63)(h|#68)(M|#4[dD])(e|#65)(d|#64)(i|#69)(a|#61)/
+		$h_hex1b = /\/R#69(c|#63)(h|#68)(M|#4[dD])(e|#65)(d|#64)(i|#69)(a|#61)/
+		$h_hex1c = /\/Ri(c|#63)(h|#68)(M|#4[dD])(e|#65)(d|#64)(i|#69)(a|#61)/
+		$h_plain = "RichMedia"
 
 	condition: any of them
 }
@@ -1232,7 +1235,9 @@ rule pdf_warning_openaction {
 		mitre = "T1203 T1204.002"
 
 	strings:
-		$h_reg1 = /\/(O|#4F)(p|#70)(e|#65)(n|#6e)(A|#41)(c|#63)(t|#74)(i|#69)(o|#6F)(n|6e)/
+		$h_reg1a = /\/#4[fF](p|#70)(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
+		$h_reg1b = /\/O#70(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
+		$h_reg1c = /\/Op(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
 	condition: any of them
 }
 
@@ -1251,7 +1256,9 @@ rule pdf_suspicious_openaction_active {
 		mitre = "T1203 T1204.002"
 
 	strings:
-		$open = /\/(O|#4[Ff])(p|#70)(e|#65)(n|#6[Ee])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[Ff])(n|#6[Ee])/
+		$open1 = /\/#4[fF](p|#70)(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
+		$open2 = /\/O#70(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
+		$open3 = /\/Op(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
 		$act1 = "/JavaScript" nocase
 		$act2 = "/JS"
 		$act3 = "/Launch" nocase
@@ -1261,7 +1268,7 @@ rule pdf_suspicious_openaction_active {
 		$act7 = "/GoToR" nocase
 		$act8 = "/GoToE" nocase
 	condition:
-		$open and any of ($act*)
+		any of ($open*) and any of ($act*)
 }
 
 
@@ -1300,8 +1307,9 @@ rule pdf_warning_remote_action {
 		desc = "pdf.information action uri link"
 		mitre = "T1566.002"
 	strings:
-		$h_reg1 = /\/(A|#41)(c|#63)(t|#74)(i|#69)(o|#6F)(n|6e)\s*\/(U|#55)(R|#52)(I|49)/
-		$h_reg2 = /\/(A|#41)(c|#63)(t|#74)(i|#69)(o|#6F)(n|6e)\s*\/(S|#53)\s*\/(U|#55)(R|#52)(I|49)/
+		$h_reg1a = /\/#41(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])\s*(\/(S|#53)\s*)?\/(U|#55)(R|#52)(I|#49)/
+		$h_reg1b = /\/A#63(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])\s*(\/(S|#53)\s*)?\/(U|#55)(R|#52)(I|#49)/
+		$h_reg1c = /\/Ac(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])\s*(\/(S|#53)\s*)?\/(U|#55)(R|#52)(I|#49)/
 
 
 	condition: any of them
@@ -1385,9 +1393,9 @@ rule suspicious_obfuscation_getAnnots_access_blocks {
 		mitre = "T1059.007"
 
 	strings:
-        $h_hex1 = {67 [0-2] 65 [0-2] 74 [0-2] 41 [0-2] 6E [0-2] 6E [0-2] 6F [0-2] 74}
-
         $h_str2 = "getAnnots" nocase ascii wide
+        $h_obf1 = /get["'\s+\\]{1,8}Annot/i
+        $h_obf2 = /g\\x65tAnnot/i
 		//$h_reg1 = /g(\W{0,2}?)e(\W{0,2}?)t(\W{0,2}?)A([\W]{0,2}?)n([\W]{0,1}?)n([\W]{0,2}?)o([\W]{0,2}?)t/ //slow
 
 	condition: any of them
@@ -1629,9 +1637,9 @@ rule suspicious_string_base_64_nop_sled_used_in_TIFF_overflow_CVE_2010_0188 {
 		desc = "suspicious.string base 64 nop sled used in TIFF overflow CVE-2010-0188"
 		mitre = "T1203 T1204.002"
 	strings:
-		$h_raw1 = "JCQkJCQkJCQkJCQkJCQkJCQkJCQk" nocase
-		$h_raw2 = "TU0AKgAAIDgMkAyQDJAMkAyQDJAMk" nocase
-        $h_hex3 = { 4A [1-2] 43 [1-2] 51 [1-2] 6B [1-2] 4A [1-2] 43 [1-2] 51 [1-2] 6B}
+		$h_raw1 = "JCQkJCQkJCQkJCQkJCQkJCQkJCQk" nocase ascii wide
+		$h_raw2 = "TU0AKgAAIDgMkAyQDJAMkAyQDJAMk" nocase ascii wide
+		$h_wrap3 = /JCQk[\r\n\s]{1,4}JCQk[\r\n\s]{1,4}JCQk/ nocase
 		//$h_reg3 = /J.{1,2}?C.{1,2}?Q.{1,2}?k.{1,2}?J.{1,2}?C.{1,2}?Q.{1,2}?k.{1,2}?J.{1,2}?C.{1,2}?Q.{1,2}?k/ //slow
 		$h_raw4 = "+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4" nocase
 
@@ -2332,8 +2340,8 @@ rule pdf_exploit_JSF_obfuscated_payload {
         	$index_builder = /\[\+!\+\[\]\]\+\[\+!\+\[\]\]/
 
         	// Acrobat specific suspicious calls often found with this
-        	$getField_val = /getField\(.*\)\.["']v["']\s*\+\s*.*\s*\+\s*["']ue["']/i
-        	$setTimeout_obf = /"s"\s*\+\s*.*\s*\+\s*"tTim"/i
+        	$getField_val = /getField\([^\)]{0,120}\)\.["']v["']\s*\+\s*[^\r\n]{1,120}\s*\+\s*["']ue["']/i
+        	$setTimeout_obf = /"s"\s*\+\s*[^\r\n]{1,120}\s*\+\s*"tTim"/i
         	$soap_obf = /SOAP\["stre"/i
 
     condition:
@@ -2531,16 +2539,25 @@ rule pdf_suspicious_name_hex_obfuscation {
 		desc = "pdf.warning dictionary name hex-escape obfuscation"
 		mitre = "T1027"
 	strings:
-		$f1 = /\/(F|#46|#66)(i|#69)(l|#6[cC])(t|#74)(e|#65)(r|#72)/
-		$f2 = /\/(O|#4[fF])(p|#70)(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
-		$f3 = /\/(F|#46|#66)(l|#6[cC])(a|#61)(t|#74)(e|#65)(D|#44|#64)(e|#65)(c|#63)(o|#6[fF])(d|#64)(e|#65)/
-		$f4 = /\/(J|#4[aA])(a|#61)(v|#76)(a|#61)(S|#53|#73)(c|#63)(r|#72)(i|#69)(p|#70)(t|#74)/
+		$fi_a = /\/#46(i|#69)(l|#6[cC])(t|#74)(e|#65)(r|#72)/
+		$fi_b = /\/F#69(l|#6[cC])(t|#74)(e|#65)(r|#72)/
+		$fi_c = /\/Fi(l|#6[cC])(t|#74)(e|#65)(r|#72)/
+		$oa_a = /\/#4[fF](p|#70)(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
+		$oa_b = /\/O#70(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
+		$oa_c = /\/Op(e|#65)(n|#6[eE])(A|#41)(c|#63)(t|#74)(i|#69)(o|#6[fF])(n|#6[eE])/
+		$fl_a = /\/#46(l|#6[cC])(a|#61)(t|#74)(e|#65)(D|#44)(e|#65)(c|#63)(o|#6[fF])(d|#64)(e|#65)/
+		$fl_b = /\/F#6[cC](a|#61)(t|#74)(e|#65)(D|#44)(e|#65)(c|#63)(o|#6[fF])(d|#64)(e|#65)/
+		$fl_c = /\/Fl(a|#61)(t|#74)(e|#65)(D|#44)(e|#65)(c|#63)(o|#6[fF])(d|#64)(e|#65)/
+		$js_a = /\/#4[aA](a|#61)(v|#76)(a|#61)(S|#53)(c|#63)(r|#72)(i|#69)(p|#70)(t|#74)/
+		$js_b = /\/J#61(v|#76)(a|#61)(S|#53)(c|#63)(r|#72)(i|#69)(p|#70)(t|#74)/
+		$js_c = /\/Ja(v|#76)(a|#61)(S|#53)(c|#63)(r|#72)(i|#69)(p|#70)(t|#74)/
 		$plain1 = "/Filter"
 		$plain2 = "/OpenAction"
 		$plain3 = "/FlateDecode"
 		$plain4 = "/JavaScript"
 	condition:
-		(#f1 > #plain1) or (#f2 > #plain2) or (#f3 > #plain3) or (#f4 > #plain4)
+		any of ($fi_a, $fi_b, $oa_a, $oa_b, $fl_a, $fl_b, $js_a, $js_b) or
+		(#fi_c > #plain1) or (#oa_c > #plain2) or (#fl_c > #plain3) or (#js_c > #plain4)
 }
 
 rule pdf_exploit_CVE_2026_34621 {

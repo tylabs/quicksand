@@ -101,10 +101,10 @@
 
             <h2>Search by Hash</h2>
             <p>Search for previous analysis results:</p>
-            <pre><code>GET <span id="search-url">${API_BASE_URL}/search</span>?query=<md5></code></pre>
+            <pre><code>GET <span id="search-url">${API_BASE_URL}/search</span>?query=<sha256></code></pre>
             <p>Parameters:</p>
             <ul>
-                <li><code>query</code>: MD5 hash of the file to search for</li>
+                <li><code>query</code>: 64-character SHA-256 (or 128-character SHA-512) hex digest of the file to search for</li>
             </ul>
 
             <h2>Python 3 Example</h2>

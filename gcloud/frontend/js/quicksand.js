@@ -1,6 +1,6 @@
 /*
  * QuickSand Frontend JavaScript
- * Copyright (c) 2024 Tyler McLellan / @tylabs
+ * Copyright (c) 2024-2026 Tyler McLellan / @tylabs
  * Website: https://tylabs.com
  */
 
@@ -25,210 +25,251 @@ var attackjson = null;
 
 function getAttack(technique) {
 	if (attackjson == null) {
-		console.log("get json");
 		var oReq = new XMLHttpRequest();
-
 		var url = CONFIG.MITRE_JSON_PATH;
 		oReq.open("GET", url, false);
 		oReq.overrideMimeType("application/json");
 		oReq.send();
 		if (oReq.status == 200) {
-			attackjson = JSON.parse(oReq.responseText);
-		} else {
-			console.log(oReq.response);
+			try {
+				attackjson = JSON.parse(oReq.responseText);
+			} catch (e) {
+				attackjson = {};
+			}
 		}
-	
 	}
 
-	if (attackjson != null) {
-		console.log("check");
-		console.log(technique);
+	if (attackjson != null && Object.prototype.hasOwnProperty.call(attackjson, technique)) {
 		return attackjson[technique];
 	}
 	return null;
 }
 
-
-function baseName(base)
-{
-	return base.split(/[\\/]/).pop();
+function baseName(base) {
+	return String(base || "").split(/[\\/]/).pop();
 }
 
+function escapeHtml(val) {
+	return String(val == null ? "" : val)
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;")
+		.replace(/`/g, "&#96;");
+}
+
+function safeHref(url) {
+	var raw = String(url == null ? "" : url).trim();
+	if (/^(?:javascript|data|vbscript):/i.test(raw)) {
+		return "#";
+	}
+	return escapeHtml(raw);
+}
 
 function doReport(r) {
+	if (!r || typeof r !== "object") {
+		return "<p>Invalid report payload</p>";
+	}
 	var out = "<H3>Metadata</H3>";
 	out += "<p>";
-	if (typeof r['filename'] != "undefined") {
-		out += "filename:&nbsp;" + baseName(r['filename'].replace(/(<([^>]+)>)/ig,"")) + "<br>";
-
+	if (typeof r['filename'] != "undefined" && r['filename'] !== null) {
+		out += "filename:&nbsp;" + escapeHtml(baseName(r['filename'])) + "<br>";
 	}
-	out += "type:&nbsp;" + r['type'] + "<br>";
-	out += "md5:&nbsp;" + r['md5'] + "<br>";
-	out += "sha1:&nbsp;" + r['sha1'] + "<br>";
-	out += "sha256:&nbsp;" + r['sha256'] + "<br>";
-	out += "size:&nbsp;" + r['size'];
+	out += "type:&nbsp;" + escapeHtml(r['type']) + "<br>";
+	out += "md5:&nbsp;" + escapeHtml(r['md5']) + "<br>";
+	out += "sha1:&nbsp;" + escapeHtml(r['sha1']) + "<br>";
+	out += "sha256:&nbsp;" + escapeHtml(r['sha256']) + "<br>";
+	out += "size:&nbsp;" + escapeHtml(r['size']);
 	if (typeof r['cart'] == "object" && r['cart'] !== null) {
 		if (typeof r['cart']['name'] == "string" && r['cart']['name'] !== "") {
-			out += "<br>cart_name:&nbsp;" + baseName(r['cart']['name'].replace(/(<([^>]+)>)/ig,""));
+			out += "<br>cart_name:&nbsp;" + escapeHtml(baseName(r['cart']['name']));
 		}
 		if (typeof r['cart']['payload_sha256'] == "string") {
-			out += "<br>payload_sha256:&nbsp;" + r['cart']['payload_sha256'];
+			out += "<br>payload_sha256:&nbsp;" + escapeHtml(r['cart']['payload_sha256']);
 		}
 	}
 	out += "</P>";
-	out += "<p>started:&nbsp;" + r['started'] + "<br>";
-	out += "finished:&nbsp;" + r['finished'] + "<br>";
-	out += "elapsed:&nbsp;" + r['elapsed'] + "<br>";
-	out += "version:&nbsp;" + r['version'] + "</P>";
-
+	out += "<p>started:&nbsp;" + escapeHtml(r['started']) + "<br>";
+	out += "finished:&nbsp;" + escapeHtml(r['finished']) + "<br>";
+	out += "elapsed:&nbsp;" + escapeHtml(r['elapsed']) + "<br>";
+	out += "version:&nbsp;" + escapeHtml(r['version']) + "</P>";
 
 	if (typeof r['structhash'] != "undefined") {
 		out += "<H3>Similarity</H3>";
-		out += "<p>structhash:&nbsp;" + r['structhash'] + "<br>";
-		//out += "structhash version:&nbsp;v" + r['structhash_version'] + "<br>";
+		out += "<p>structhash:&nbsp;" + escapeHtml(r['structhash']) + "<br>";
 		if (typeof r['struzzy'] != "undefined") {
-			out += "struzzy:&nbsp;" + r['structhash_elements'] + ":" + r['struzzy'] + "<br>";
-
+			out += "struzzy:&nbsp;" + escapeHtml(r['structhash_elements']) + ":" + escapeHtml(r['struzzy']) + "<br>";
 		}
 		out += "</P>";
 	}
 
-
+	var safeRating = parseInt(r['rating'], 10);
+	if (isNaN(safeRating)) {
+		safeRating = 0;
+	}
+	var safeRisk = escapeHtml(r['risk']);
 	out += "<H3>Result</H3>";
 	out += "<canvas width=200 height=100 id=\"risk\"></canvas>";
-	if (r['rating'] == 1) {
-		out += "<p>risk:&nbsp;<font color=crimson>" + r['risk'] + "</font><br>";
-	} else if (r['rating'] == 2) {
-		out += "<p>risk:&nbsp;<font color=red>" + r['risk'] + "</font><br>";
-	} else if (r['rating'] == 3) {
-		out += "<p>risk:&nbsp;<font color=darkred>" + r['risk'] + "</font><br>";
+	if (safeRating == 1) {
+		out += "<p>risk:&nbsp;<font color=crimson>" + safeRisk + "</font><br>";
+	} else if (safeRating == 2) {
+		out += "<p>risk:&nbsp;<font color=red>" + safeRisk + "</font><br>";
+	} else if (safeRating == 3) {
+		out += "<p>risk:&nbsp;<font color=darkred>" + safeRisk + "</font><br>";
 	} else {
-		out += "<p>risk:&nbsp;<font color=limegreen>" + r['risk'] + "</font><br>";
+		out += "<p>risk:&nbsp;<font color=limegreen>" + safeRisk + "</font><br>";
 	}
-	out += "score:&nbsp;" + r['score'] + "</P>";
+	out += "score:&nbsp;" + escapeHtml(r['score']) + "</P>";
 
-	out += "<input type=hidden id=\"rating\" name=\"rating\" value=\"" + r['rating'] + "\">";
+	out += "<input type=hidden id=\"rating\" name=\"rating\" value=\"" + safeRating + "\">";
 
-	for (var name in r['results']) {
-		out += "<h4>@" + name + ":</H4>";
-		for (var i in r['results'][name]) {
-			console.log(name);
-			out += "<P>Yara rule:<b>&nbsp;" + r['results'][name][i]["rule"] + "</b><BR>";
-			out += "Description:&nbsp;<B>" + r['results'][name][i]["desc"] + "</b><BR>";
-
-			if (typeof r['results'][name][i]["mitre"] != "undefined") {
-				var mitre = r['results'][name][i]["mitre"].split(" ");
-
-				out += "Mitre Att&ck Technique:";
-				for (var attack in mitre) {
-					var technique = getAttack(mitre[attack]);
-					if (technique != null) {
-						out += "&nbsp;<span class=\"mitre\" title=\"" + technique + "\">" + mitre[attack] + "</span> ";
-					} else {
-
-						out += "&nbsp;<span class=\"mitre\">" + mitre[attack] + " </span>";
-					}
+	if (typeof r['results'] === "object" && r['results'] !== null) {
+		for (var name in r['results']) {
+			if (!Object.prototype.hasOwnProperty.call(r['results'], name)) continue;
+			out += "<h4>@" + escapeHtml(name) + ":</H4>";
+			var streamHits = r['results'][name];
+			if (!streamHits || typeof streamHits !== "object") continue;
+			for (var i in streamHits) {
+				if (!Object.prototype.hasOwnProperty.call(streamHits, i)) continue;
+				var hit = streamHits[i] || {};
+				out += "<P>Yara rule:<b>&nbsp;" + escapeHtml(hit["rule"]) + "</b>";
+				if (typeof hit["type"] != "undefined" && hit["type"] !== null && hit["type"] !== "") {
+					out += "&nbsp;(" + escapeHtml(hit["type"]) + ")";
 				}
-			}
-			out += "</p>";
+				out += "<BR>";
+				out += "Description:&nbsp;<B>" + escapeHtml(hit["desc"]) + "</b><BR>";
 
-			if (typeof r['results'][name][i]["strings"] != "undefined") {
-				out += "<ul>";
-				// Check if strings is an array (old format) or a string (new format)
-				if (Array.isArray(r['results'][name][i]["strings"])) {
-					// Old format handling - strings is an array of arrays
-					for (var string in r['results'][name][i]["strings"]) {
-						out += "<li>@" + r['results'][name][i]["strings"][string][0] + ": <small>" + r['results'][name][i]["strings"][string][2] + "</small></li>";
-					}
-				} else {
-					// New format handling - strings is a string with newline-separated entries
-					var stringsArray = r['results'][name][i]["strings"].split("\n");
-					for (var j = 0; j < stringsArray.length; j++) {
-						var line = stringsArray[j].trim();
-						if (line) {
-							// Parse the line which should be in format "identifier at offset X: data"
-							var parts = line.split("at offset");
-							if (parts.length >= 2) {
-								var identifier = parts[0].trim();
-								var restParts = parts[1].split(":");
-								if (restParts.length >= 2) {
-									var offset = restParts[0].trim();
-									var data = restParts.slice(1).join(":").trim();
-									out += "<li>@" + identifier + ": <small>" + data + "</small></li>";
-								} else {
-									out += "<li>" + line + "</li>";
-								}
-							} else {
-								out += "<li>" + line + "</li>";
-							}
+				if (typeof hit["mitre"] != "undefined" && hit["mitre"] !== null && String(hit["mitre"]).trim() !== "") {
+					var mitre = String(hit["mitre"]).split(/\s+/);
+					out += "Mitre Att&amp;ck Technique:";
+					for (var attack = 0; attack < mitre.length; attack++) {
+						var techId = mitre[attack];
+						if (!techId) continue;
+						var technique = getAttack(techId);
+						if (technique != null) {
+							out += "&nbsp;<span class=\"mitre\" title=\"" + escapeHtml(technique) + "\">" + escapeHtml(techId) + "</span> ";
+						} else {
+							out += "&nbsp;<span class=\"mitre\">" + escapeHtml(techId) + " </span>";
 						}
 					}
 				}
-				out += "</ul>";
+				out += "</p>";
+
+				if (typeof hit["strings"] != "undefined" && hit["strings"] !== null) {
+					out += "<ul>";
+					if (Array.isArray(hit["strings"])) {
+						for (var sIdx = 0; sIdx < hit["strings"].length; sIdx++) {
+							var sTuple = hit["strings"][sIdx] || [];
+							out += "<li>@" + escapeHtml(sTuple[0]) + ": <small>" + escapeHtml(sTuple[2]) + "</small></li>";
+						}
+					} else {
+						var stringsArray = String(hit["strings"]).split("\n");
+						for (var j = 0; j < stringsArray.length; j++) {
+							var line = stringsArray[j].trim();
+							if (line) {
+								var parts = line.split("at offset");
+								if (parts.length >= 2) {
+									var identifier = parts[0].trim();
+									var restParts = parts[1].split(":");
+									if (restParts.length >= 2) {
+										var offsetVal = restParts[0].trim();
+										var data = restParts.slice(1).join(":").trim();
+										out += "<li>@" + escapeHtml(identifier) + " (" + escapeHtml(offsetVal) + "): <small>" + escapeHtml(data) + "</small></li>";
+									} else {
+										out += "<li>" + escapeHtml(line) + "</li>";
+									}
+								} else {
+									out += "<li>" + escapeHtml(line) + "</li>";
+								}
+							}
+						}
+					}
+					out += "</ul>";
+				}
 			}
 		}
-
 	}
 
-	out += "<P><small><a target=\"_blank\" href=\"" + API_ENDPOINTS.SEARCH + "?query=" + r['md5'] + "\">json</a> | <a target=\"_blank\" href=\"" + CONFIG.HOWTO_URL + "\">how to interpret these results</a></small></P>";
+	var lookupHash = String(r['sha256'] || r['sha512'] || "");
+	var searchHref = safeHref(API_ENDPOINTS.SEARCH + "?query=" + encodeURIComponent(lookupHash));
+	out += "<P><small><a target=\"_blank\" rel=\"noopener noreferrer\" href=\"" + searchHref + "\">json</a> | <a target=\"_blank\" rel=\"noopener noreferrer\" href=\"" + safeHref(CONFIG.HOWTO_URL) + "\">how to interpret these results</a></small></P>";
 
-        return out;
+	return out;
 }
 
-function get(name){
-   if(name=(new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(location.search))
-      return decodeURIComponent(name[1]);
+function get(name) {
+	try {
+		if (typeof URLSearchParams !== "undefined") {
+			var params = new URLSearchParams(window.location.search);
+			var val = params.get(name);
+			return val === null ? undefined : val;
+		}
+	} catch (e) {
+		// Fall through to regex parser
+	}
+	try {
+		var m = (new RegExp('[?&]' + encodeURIComponent(name) + '=([^&]*)')).exec(location.search);
+		if (m) {
+			return decodeURIComponent(m[1].replace(/\+/g, " "));
+		}
+	} catch (e) {
+		return undefined;
+	}
+	return undefined;
 }
 
 function speed(risk) {
-   var opts = {
-  	lines: 12,
-  	angle: 0.15,
-  	lineWidth: 0.44,
-  	pointer: {
-    	length: 0.5,
-    	strokeWidth: 0.035,
-    	color: '#000000'
-  	},
-  limitMax: 'false', 
-  percentColors: [[0.0, "#a9d70b" ], [0.50, "#f9c802"], [1.0, "#ff0000"]],
-  staticZones: [
-   	{strokeStyle: "#30B32D", min: 0, max: 1.5}, // green
-   	{strokeStyle: "#FFDD00", min: 1.5, max: 2.5}, // Yellow
-   	{strokeStyle: "#FF8C00", min: 2.5, max: 3.5}, // Orange
-   	{strokeStyle: "#F03E3E", min: 3.5, max: 5}  // Red
-	],
-  strokeColor: '#E0E0E0',
-  generateGradient: true
-  };
-  var target = document.getElementById('risk');
-  var gauge = new Gauge(target).setOptions(opts);
-  gauge.maxValue = 5;
-  gauge.animationSpeed = 32;
-  var score = parseInt(risk, 10) + 1;
-  console.log("the risk score on the speedometer is " + score);
-  gauge.set(score);
+	var opts = {
+		lines: 12,
+		angle: 0.15,
+		lineWidth: 0.44,
+		pointer: {
+			length: 0.5,
+			strokeWidth: 0.035,
+			color: '#000000'
+		},
+		limitMax: 'false',
+		percentColors: [[0.0, "#a9d70b"], [0.50, "#f9c802"], [1.0, "#ff0000"]],
+		staticZones: [
+			{strokeStyle: "#30B32D", min: 0, max: 1.5},
+			{strokeStyle: "#FFDD00", min: 1.5, max: 2.5},
+			{strokeStyle: "#FF8C00", min: 2.5, max: 3.5},
+			{strokeStyle: "#F03E3E", min: 3.5, max: 5}
+		],
+		strokeColor: '#E0E0E0',
+		generateGradient: true
+	};
+	var target = document.getElementById('risk');
+	if (!target || typeof Gauge === "undefined") return;
+	var gauge = new Gauge(target).setOptions(opts);
+	gauge.maxValue = 5;
+	gauge.animationSpeed = 32;
+	var score = (parseInt(risk, 10) || 0) + 1;
+	gauge.set(score);
 }
 
-
 function process() {
-	var uuid = get('uuid').replace(/(<([^>]+)>)/ig,"");
-	document.getElementById("text").innerHTML = "<font color=orange>Processing.... Task ID: " + uuid + "</font>";
-
+	var rawUuid = String(get('uuid') || "").trim();
+	var safeUuid = escapeHtml(rawUuid);
+	document.getElementById("text").innerHTML = "<font color=orange>Processing.... Task ID: " + safeUuid + "</font>";
 
 	var oReq = new XMLHttpRequest();
-
 	oReq.onreadystatechange = function() {
-    	if (this.readyState == 4 && this.status == 200) {
-		document.getElementById("text").innerHTML = "<font color=red>Complete.... Task ID: " + uuid + "</font>";
-		var myArr = JSON.parse(this.responseText);
-        	document.getElementById("qsreport").innerHTML = doReport(myArr);
-		speed(document.getElementById("rating").value);
-    	} else if (this.readyState == 4 && this.status == 500) {
-		document.getElementById("text").innerHTML = "<font color=red>Exceeded Time.... Task ID: " + uuid + "</font>";
-    	}
+		if (this.readyState == 4) {
+			if (this.status == 200) {
+				document.getElementById("text").innerHTML = "<font color=red>Complete.... Task ID: " + safeUuid + "</font>";
+				var myArr = JSON.parse(this.responseText);
+				document.getElementById("qsreport").innerHTML = doReport(myArr);
+				speed(document.getElementById("rating").value);
+			} else if (this.status == 504 || this.status == 500) {
+				document.getElementById("text").innerHTML = "<font color=red>Exceeded Time.... Task ID: " + safeUuid + "</font>";
+			} else {
+				document.getElementById("text").innerHTML = "<font color=red>Analysis Error (" + escapeHtml(this.status) + ").... Task ID: " + safeUuid + "</font>";
+			}
+		}
 	};
-	var url = API_ENDPOINTS.ANALYZE + "?uuid=" + uuid;
+	var url = API_ENDPOINTS.ANALYZE + "?uuid=" + encodeURIComponent(rawUuid);
 	if (typeof get('rerun') != "undefined" && get('rerun') == "1") {
 		url += "&rerun=1";
 	}
@@ -240,165 +281,124 @@ function process() {
 }
 
 function search() {
-	var hash = get('query').replace(/(<([^>]+)>)/ig,"");
-	console.log(hash);
-	if (hash != "") {
-		document.getElementById("text").innerHTML = "<font color=orange>Searching.... Query: " + hash + "</font>";
-
+	var rawHash = String(get('query') || "").trim();
+	var safeHash = escapeHtml(rawHash);
+	if (rawHash != "") {
+		document.getElementById("text").innerHTML = "<font color=orange>Searching.... Query: " + safeHash + "</font>";
 
 		var oReq = new XMLHttpRequest();
-
 		oReq.onreadystatechange = function() {
-    			if (this.readyState == 4 && this.status == 200) {
-				var myArr = JSON.parse(this.responseText);
-				if (typeof myArr['error'] != "undefined") {
-					document.getElementById("text").innerHTML = "<font color=red>Not Found.... Query: " + hash + "</font>";
-
+			if (this.readyState == 4) {
+				if (this.status == 200) {
+					var myArr = JSON.parse(this.responseText);
+					if (typeof myArr['error'] != "undefined") {
+						document.getElementById("text").innerHTML = "<font color=red>Not Found.... Query: " + safeHash + "</font>";
+					} else {
+						document.getElementById("text").innerHTML = "<font color=red>Found.... Query: " + safeHash + "</font>";
+						document.getElementById("qsreport").innerHTML = doReport(myArr);
+						speed(document.getElementById("rating").value);
+					}
+				} else if (this.status == 404 || this.status == 400) {
+					document.getElementById("text").innerHTML = "<font color=red>Not Found.... Query: " + safeHash + "</font>";
+				} else if (this.status == 500 || this.status == 504) {
+					document.getElementById("text").innerHTML = "<font color=red>Exceeded Time.... Query: " + safeHash + "</font>";
 				} else {
-					document.getElementById("text").innerHTML = "<font color=red>Found.... Query: " + hash + "</font>";
-					document.getElementById("qsreport").innerHTML = doReport(myArr);
-					speed(document.getElementById("rating").value);
-
+					document.getElementById("text").innerHTML = "<font color=red>Search Error (" + escapeHtml(this.status) + ").... Query: " + safeHash + "</font>";
 				}
-    			} else if (this.readyState == 4 && this.status == 500) {
-				document.getElementById("text").innerHTML = "<font color=red>Exceeded Time.... Query: " + hash + "</font>";
-    			}
+			}
 		};
 
-
-		oReq.open("GET", API_ENDPOINTS.SEARCH + "?query=" + hash);
+		oReq.open("GET", API_ENDPOINTS.SEARCH + "?query=" + encodeURIComponent(rawHash));
 		oReq.send();
 	}
 }
 
-
-
-function reqListener () {
-  console.log(this.responseText);
+function reqListener() {
+	console.log(this.responseText);
 }
 
 function getSignature() {
 	var filelist = document.getElementById('file');
 	var file = filelist.files[0];
-	
+
 	if (!file) {
-		console.log("No file selected");
 		document.getElementById("qserror").innerHTML = "<font color=red>Please select a file to analyze</font>";
 		return false;
 	}
-	
-	console.log("File selected:", {
-		name: file.name,
-		size: file.size,
-		type: file.type
-	});
-	
+
 	if (file.size > CONFIG.MAX_FILE_SIZE) {
-		console.log("File too large:", file.size);
-		document.getElementById("qserror").innerHTML = "<font color=red>File over 20MB Size: " + file.size + "</font>";
+		document.getElementById("qserror").innerHTML = "<font color=red>File over 20MB Size: " + escapeHtml(file.size) + "</font>";
 		return false;
 	}
 
-	// Show processing message
 	document.getElementById("qserror").innerHTML = "<font color=orange>Getting upload URL...</font>";
-	console.log("Requesting signed URL from:", API_ENDPOINTS.UPLOAD + "?filename=" + encodeURIComponent(file.name));
 
 	var oReq = new XMLHttpRequest();
 	oReq.onreadystatechange = function() {
-		console.log("Signature request state:", this.readyState, "Status:", this.status);
 		if (this.readyState == 4 && this.status == 200) {
 			try {
 				var response = JSON.parse(this.responseText);
-				console.log("Received signed URL response:", response);
-				
-				if (response.upload_url) {
-					// Show uploading message
+				if (response.upload_url && response.meta) {
 					document.getElementById("qserror").innerHTML = "<font color=orange>Uploading file...</font>";
-					console.log("Preparing to upload file to:", response.upload_url);
-					
-					// Upload the file to the signed URL
+
 					var uploadReq = new XMLHttpRequest();
 					uploadReq.open("PUT", response.upload_url);
-					
-					// Add required headers
-					console.log("Setting upload headers:", {
-						"x-goog-meta-ip": response.meta.submitter_ip,
-						"x-goog-meta-original-filename": response.meta.original_filename
-					});
-					
-					uploadReq.setRequestHeader("x-goog-meta-ip", response.meta.submitter_ip);
-					uploadReq.setRequestHeader("x-goog-meta-original-filename", response.meta.original_filename);
-					
+
+					uploadReq.setRequestHeader("x-goog-meta-ip", String(response.meta.submitter_ip || "unknown"));
+					uploadReq.setRequestHeader("x-goog-meta-original-filename", String(response.meta.original_filename || "unknown"));
+					if (response.meta.content_length_range) {
+						uploadReq.setRequestHeader("x-goog-content-length-range", String(response.meta.content_length_range));
+					}
+
 					uploadReq.onreadystatechange = function() {
-						console.log("Upload request state:", this.readyState, "Status:", this.status);
 						if (this.readyState == 4) {
 							if (this.status === 200 || this.status === 201) {
-								console.log("Upload successful, redirecting to report page...");
-								// Show success message
 								document.getElementById("qserror").innerHTML = "<font color=green>Upload successful! Redirecting to analysis...</font>";
-								
-								// Get the uuid from the meta object in the response
 								var uuid = response.meta.uuid;
-								if (!uuid) {
-									console.error("No uuid in response meta:", response);
+								if (!uuid || !/^[A-Za-z0-9._-]+$/.test(String(uuid))) {
 									document.getElementById("qserror").innerHTML = "<font color=red>Error: No analysis ID received</font>";
 									return;
 								}
-								
-								// Redirect to report.html with the uuid
-								window.location.href = CONFIG.REPORT_URL + "?uuid=" + uuid;
+								window.location.href = CONFIG.REPORT_URL + "?uuid=" + encodeURIComponent(String(uuid));
 							} else {
-								console.error("Upload failed with status:", this.status);
-								console.error("Response:", this.responseText);
-								document.getElementById("qserror").innerHTML = "<font color=red>Upload failed: " + this.status + "</font>";
+								document.getElementById("qserror").innerHTML = "<font color=red>Upload failed: " + escapeHtml(this.status) + "</font>";
 							}
 						}
 					};
-					
-					uploadReq.onerror = function(e) {
-						console.error("Upload network error:", e);
+
+					uploadReq.onerror = function() {
 						document.getElementById("qserror").innerHTML = "<font color=red>Upload failed: Network error</font>";
 					};
-					
-					console.log("Starting file upload...");
+
 					uploadReq.send(file);
 				} else {
-					console.error("No upload URL in response");
 					document.getElementById("qserror").innerHTML = "<font color=red>Failed to get upload URL</font>";
 				}
 			} catch (e) {
-				console.error("Error processing server response:", e);
-				document.getElementById("qserror").innerHTML = "<font color=red>Error processing server response: " + e.message + "</font>";
+				document.getElementById("qserror").innerHTML = "<font color=red>Error processing server response: " + escapeHtml(e.message) + "</font>";
 			}
 		} else if (this.readyState == 4) {
-			console.error("Failed to get signature:", this.status);
-			console.error("Response:", this.responseText);
-			document.getElementById("qserror").innerHTML = "<font color=red>Failed to get signature: " + this.status + "</font>";
+			document.getElementById("qserror").innerHTML = "<font color=red>Failed to get signature: " + escapeHtml(this.status) + "</font>";
 		}
 	};
 
-	oReq.onerror = function(e) {
-		console.error("Signature request network error:", e);
+	oReq.onerror = function() {
 		document.getElementById("qserror").innerHTML = "<font color=red>Failed to get signature: Network error</font>";
 	};
 
 	oReq.open("GET", API_ENDPOINTS.UPLOAD + "?filename=" + encodeURIComponent(file.name));
-	console.log("Sending signature request...");
 	oReq.send();
-	
-	return false; // Prevent form submission
+
+	return false;
 }
 
-// Function to poll for analysis results
 function pollAnalysisResults(url) {
-	var pollInterval = 2000; // Poll every 2 seconds
-	var maxAttempts = 30; // Maximum number of attempts (1 minute total)
+	var pollInterval = 2000;
+	var maxAttempts = 30;
 	var attempts = 0;
-	
+
 	function checkResults() {
 		attempts++;
-		console.log("Polling attempt", attempts, "of", maxAttempts);
-		
 		var xhr = new XMLHttpRequest();
 		xhr.onreadystatechange = function() {
 			if (this.readyState == 4) {
@@ -406,70 +406,63 @@ function pollAnalysisResults(url) {
 					try {
 						var results = JSON.parse(this.responseText);
 						if (results.error) {
-							if (results.error === "exception") {
-								document.getElementById("qserror").innerHTML = "<font color=red>Analysis failed: " + results.message + "</font>";
+							if (results.error === "exception" || results.error === "timeout") {
+								document.getElementById("qserror").innerHTML = "<font color=red>Analysis failed: " + escapeHtml(results.message) + "</font>";
 								return;
 							}
-							// If we get a "processing" error, continue polling
 							if (attempts < maxAttempts) {
 								setTimeout(checkResults, pollInterval);
 							} else {
 								document.getElementById("qserror").innerHTML = "<font color=red>Analysis timed out</font>";
 							}
 						} else {
-							console.log("Analysis results received");
 							document.getElementById("qserror").innerHTML = "<font color=green>Analysis complete!</font>";
 							document.getElementById("qsreport").innerHTML = doReport(results);
 							speed(document.getElementById("rating").value);
 						}
 					} catch (e) {
-						console.error("Error parsing results:", e);
-						document.getElementById("qserror").innerHTML = "<font color=red>Error processing results: " + e.message + "</font>";
+						document.getElementById("qserror").innerHTML = "<font color=red>Error processing results: " + escapeHtml(e.message) + "</font>";
 					}
+				} else if (this.status === 504) {
+					document.getElementById("qserror").innerHTML = "<font color=red>Analysis timed out</font>";
 				} else if (this.status === 500) {
-					// Server error, continue polling
 					if (attempts < maxAttempts) {
 						setTimeout(checkResults, pollInterval);
 					} else {
 						document.getElementById("qserror").innerHTML = "<font color=red>Analysis timed out</font>";
 					}
 				} else {
-					console.error("Unexpected status:", this.status);
-					document.getElementById("qserror").innerHTML = "<font color=red>Analysis failed: " + this.status + "</font>";
+					document.getElementById("qserror").innerHTML = "<font color=red>Analysis failed: " + escapeHtml(this.status) + "</font>";
 				}
 			}
 		};
-		
-		xhr.onerror = function(e) {
-			console.error("Poll request failed:", e);
+
+		xhr.onerror = function() {
 			if (attempts < maxAttempts) {
 				setTimeout(checkResults, pollInterval);
 			} else {
 				document.getElementById("qserror").innerHTML = "<font color=red>Analysis failed: Network error</font>";
 			}
 		};
-		
+
 		xhr.open("GET", url);
 		xhr.send();
 	}
-	
-	// Start polling
+
 	checkResults();
 }
 
 function doForm(r) {
-	var form=document.getElementById('quicksand')
-	console.log(r['fields']);
+	var form = document.getElementById('quicksand');
+	if (!form || !r || typeof r['fields'] !== 'object' || r['fields'] === null) return;
 	for (var name in r['fields']) {
-			console.log(name);
-			var input = document.createElement('input');//prepare a new input DOM element
-			input.setAttribute('name', name);//set the param name
-			input.setAttribute('value', r['fields'][name]);//set the value
-			input.setAttribute('type', 'hidden')//set the type, like "hidden" or other
-
-			form.insertBefore(input, form[0]);//append the input to the form
+		if (!Object.prototype.hasOwnProperty.call(r['fields'], name)) continue;
+		var input = document.createElement('input');
+		input.setAttribute('name', String(name));
+		input.setAttribute('value', String(r['fields'][name]));
+		input.setAttribute('type', 'hidden');
+		form.insertBefore(input, form[0]);
 	}
-	console.log(form);
 }
 
 function doSend() {
