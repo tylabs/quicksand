@@ -56,6 +56,9 @@ try:
 
     _HAS_CRYPTOGRAPHY = True
 except Exception:
+    _CryptoCipher = None  # type: ignore[assignment]
+    _crypto_algorithms = None  # type: ignore[assignment]
+    _crypto_modes = None  # type: ignore[assignment]
     _HAS_CRYPTOGRAPHY = False
 
 
@@ -448,9 +451,9 @@ def _aes_decrypt_block(block: bytes, round_keys: List[List[int]]) -> bytes:
 
 def _aes_ecb_decrypt(key: bytes, data: bytes, deadline: Optional[float] = None) -> bytes:
     aligned_len = len(data) - (len(data) % 16)
-    if aligned_len <= 0:
+    if aligned_len <= 0 or (deadline and time.time() > deadline):
         return b""
-    if _HAS_CRYPTOGRAPHY and len(key) in (16, 24, 32):
+    if _HAS_CRYPTOGRAPHY and _CryptoCipher is not None and len(key) in (16, 24, 32):
         decryptor = _CryptoCipher(_crypto_algorithms.AES(key), _crypto_modes.ECB()).decryptor()
         return decryptor.update(data[:aligned_len]) + decryptor.finalize()
     rks = _aes_expand_key(key)
@@ -464,10 +467,10 @@ def _aes_ecb_decrypt(key: bytes, data: bytes, deadline: Optional[float] = None) 
 
 def _aes_cbc_decrypt(key: bytes, iv: bytes, data: bytes, deadline: Optional[float] = None) -> bytes:
     aligned_len = len(data) - (len(data) % 16)
-    if aligned_len <= 0:
+    if aligned_len <= 0 or (deadline and time.time() > deadline):
         return b""
     iv16 = iv[:16] if len(iv) >= 16 else (iv + b"\x00" * (16 - len(iv)))
-    if _HAS_CRYPTOGRAPHY and len(key) in (16, 24, 32):
+    if _HAS_CRYPTOGRAPHY and _CryptoCipher is not None and len(key) in (16, 24, 32):
         decryptor = _CryptoCipher(_crypto_algorithms.AES(key), _crypto_modes.CBC(iv16)).decryptor()
         return decryptor.update(data[:aligned_len]) + decryptor.finalize()
     rks = _aes_expand_key(key)
@@ -496,7 +499,7 @@ def _aes_ctr_le_crypt(
     if not data:
         return b""
     total_len = len(data)
-    if _HAS_CRYPTOGRAPHY and len(key) in (16, 24, 32):
+    if _HAS_CRYPTOGRAPHY and _CryptoCipher is not None and len(key) in (16, 24, 32):
         encryptor = _CryptoCipher(_crypto_algorithms.AES(key), _crypto_modes.ECB()).encryptor()
         out = bytearray()
         ctr = start_counter

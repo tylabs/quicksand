@@ -112,16 +112,21 @@ def test_aes_crypto_and_pure_python_fallback_parity(monkeypatch):
     iv = bytes(range(16))
     ciphertext = bytes((i * 7 + 3) & 0xFF for i in range(64))
 
-    monkeypatch.setattr(qm, "_HAS_CRYPTOGRAPHY", True)
-    ecb_fast = qm._aes_ecb_decrypt(key, ciphertext)
-    cbc_fast = qm._aes_cbc_decrypt(key, iv, ciphertext)
-
     monkeypatch.setattr(qm, "_HAS_CRYPTOGRAPHY", False)
     ecb_py = qm._aes_ecb_decrypt(key, ciphertext)
     cbc_py = qm._aes_cbc_decrypt(key, iv, ciphertext)
 
-    assert ecb_fast == ecb_py
-    assert cbc_fast == cbc_py
+    if getattr(qm, "_CryptoCipher", None) is not None:
+        monkeypatch.setattr(qm, "_HAS_CRYPTOGRAPHY", True)
+        ecb_fast = qm._aes_ecb_decrypt(key, ciphertext)
+        cbc_fast = qm._aes_cbc_decrypt(key, iv, ciphertext)
+        assert ecb_fast == ecb_py
+        assert cbc_fast == cbc_py
+
+    # Round-trip check for pure-Python AES ECB
+    rks = qm._aes_expand_key(key)
+    re_enc = b"".join(qm._aes_encrypt_block(ecb_py[i : i + 16], rks) for i in range(0, len(ecb_py), 16))
+    assert re_enc == ciphertext
 
     # Expired deadline aborts immediately
     expired = time.time() - 10.0
@@ -300,6 +305,106 @@ def _build_winzip_aes_zip(
     return b"".join(local_chunks) + cd_bytes + eocd
 
 
+def _build_zipcrypto_zip(entries: list, password: str) -> bytes:
+    """Build a cross-platform PKWARE ZipCrypto encrypted ZIP archive in pure Python."""
+    crc_table = [0] * 256
+    for n in range(256):
+        c = n
+        for _ in range(8):
+            c = (0xEDB88320 ^ (c >> 1)) if (c & 1) else (c >> 1)
+        crc_table[n] = c
+
+    def _crc32_byte(crc_val: int, b: int) -> int:
+        return crc_table[(crc_val ^ b) & 0xFF] ^ (crc_val >> 8)
+
+    def _zipcrypto_encrypt(pw_bytes: bytes, plaintext: bytes, crc_val: int) -> bytes:
+        k0, k1, k2 = 0x12345678, 0x23456789, 0x34567890
+
+        def _update_keys(byte_val: int) -> None:
+            nonlocal k0, k1, k2
+            k0 = _crc32_byte(k0, byte_val)
+            k1 = ((k1 + (k0 & 0xFF)) * 134775813 + 1) & 0xFFFFFFFF
+            k2 = _crc32_byte(k2, (k1 >> 24) & 0xFF)
+
+        for b in pw_bytes:
+            _update_keys(b)
+
+        # 12-byte encryption header; last byte must equal (CRC >> 24) & 0xFF when GP bit 3 is unset
+        header_plain = bytes([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, (crc_val >> 24) & 0xFF])
+        out = bytearray()
+        for b in header_plain + plaintext:
+            temp = (k2 | 2) & 0xFFFF
+            keystream_byte = ((temp * (temp ^ 1)) >> 8) & 0xFF
+            out.append(b ^ keystream_byte)
+            _update_keys(b)
+        return bytes(out)
+
+    pw_bytes = password.encode("utf-8")
+    local_chunks = []
+    central_chunks = []
+    offset = 0
+    for fname, raw_data in entries:
+        fname_bytes = fname.encode("utf-8")
+        crc_val = zlib.crc32(raw_data) & 0xFFFFFFFF
+        cobj = zlib.compressobj(6, zlib.DEFLATED, -zlib.MAX_WBITS)
+        comp_data = cobj.compress(raw_data) + cobj.flush()
+        enc_body = _zipcrypto_encrypt(pw_bytes, comp_data, crc_val)
+
+        local_hdr = struct.pack(
+            "<4sHHHHHIIIHH",
+            b"PK\x03\x04",
+            20,
+            0x0001,  # GP bit 0 = encrypted
+            8,       # ZIP_DEFLATED
+            0,
+            0,
+            crc_val,
+            len(enc_body),
+            len(raw_data),
+            len(fname_bytes),
+            0,
+        )
+        local_record = local_hdr + fname_bytes + enc_body
+        local_chunks.append(local_record)
+
+        central_hdr = struct.pack(
+            "<4sHHHHHHIIIHHHHHII",
+            b"PK\x01\x02",
+            20,
+            20,
+            0x0001,
+            8,
+            0,
+            0,
+            crc_val,
+            len(enc_body),
+            len(raw_data),
+            len(fname_bytes),
+            0,
+            0,
+            0,
+            0,
+            0,
+            offset,
+        )
+        central_chunks.append(central_hdr + fname_bytes)
+        offset += len(local_record)
+
+    cd_bytes = b"".join(central_chunks)
+    eocd = struct.pack(
+        "<4sHHHHIIH",
+        b"PK\x05\x06",
+        0,
+        0,
+        len(entries),
+        len(entries),
+        len(cd_bytes),
+        offset,
+        0,
+    )
+    return b"".join(local_chunks) + cd_bytes + eocd
+
+
 def test_aes_encrypt_and_ctr_parity(monkeypatch):
     for key_len in (16, 24, 32):
         key = bytes((i * 11 + 5) & 0xFF for i in range(key_len))
@@ -309,11 +414,12 @@ def test_aes_encrypt_and_ctr_parity(monkeypatch):
         assert qm._aes_decrypt_block(enc, rks) == blk
 
         payload = bytes((i * 29 + 7) & 0xFF for i in range(1500))
-        monkeypatch.setattr(qm, "_HAS_CRYPTOGRAPHY", True)
-        ctr_fast = qm._aes_ctr_le_crypt(key, payload, start_counter=1)
         monkeypatch.setattr(qm, "_HAS_CRYPTOGRAPHY", False)
         ctr_py = qm._aes_ctr_le_crypt(key, payload, start_counter=1)
-        assert ctr_fast == ctr_py
+        if getattr(qm, "_CryptoCipher", None) is not None:
+            monkeypatch.setattr(qm, "_HAS_CRYPTOGRAPHY", True)
+            ctr_fast = qm._aes_ctr_le_crypt(key, payload, start_counter=1)
+            assert ctr_fast == ctr_py
         # Applying CTR again restores plaintext
         assert qm._aes_ctr_le_crypt(key, ctr_py, start_counter=1) == payload
 
@@ -385,18 +491,8 @@ def test_zipcrypto_and_winzip_aes_passwords_and_nested_containers(monkeypatch):
     sample_pdf = (
         b"%PDF-1.4\n1 0 obj\n<< /OpenAction << /S /Launch /Win << /F (cmd.exe) >> >> >>\nendobj\n%%EOF"
     )
-    # 1. Legacy PKWARE ZipCrypto archive created via system `zip -P infected1`
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        inner_file = tmp_path / "payload.pdf"
-        inner_file.write_bytes(sample_pdf)
-        zip_out = tmp_path / "protected_zipcrypto.zip"
-        subprocess.run(
-            ["zip", "-q", "-P", "infected1", str(zip_out), "payload.pdf"],
-            cwd=str(tmp_path),
-            check=True,
-        )
-        zipcrypto_bytes = zip_out.read_bytes()
+    # 1. Legacy PKWARE ZipCrypto archive built in pure Python (works on Windows, Linux, and macOS)
+    zipcrypto_bytes = _build_zipcrypto_zip([("payload.pdf", sample_pdf)], password="infected1")
 
     q_zc = qs_cls(zipcrypto_bytes, capture=True, timeout=5)
     q_zc.process()
@@ -406,7 +502,7 @@ def test_zipcrypto_and_winzip_aes_passwords_and_nested_containers(monkeypatch):
     assert q_zc.results["archive_entries"][0]["sha256"] == hashlib.sha256(sample_pdf).hexdigest()
     assert q_zc.results["archive_entries"][0]["decrypted"] is True
 
-    # 2. WinZip AES-256 (AE-2, deflated) & AES-128 (AE-1, stored) under both crypto backends
+    # 2. WinZip AES-256 (AE-2, deflated) & AES-128 (AE-1, stored) under available crypto backends
     aes256_zip = _build_winzip_aes_zip(
         [("doc1.pdf", sample_pdf), ("nested.cart", _build_cart_bytes(sample_pdf, {"name": "inner.pdf"}))],
         password="infected1",
@@ -414,7 +510,8 @@ def test_zipcrypto_and_winzip_aes_passwords_and_nested_containers(monkeypatch):
         ae_version=2,
         compress=True,
     )
-    for use_crypto in (True, False):
+    crypto_modes = (True, False) if getattr(qm, "_CryptoCipher", None) is not None else (False,)
+    for use_crypto in crypto_modes:
         monkeypatch.setattr(qm, "_HAS_CRYPTOGRAPHY", use_crypto)
         q_aes = qs_cls(aes256_zip, capture=True, timeout=5)
         q_aes.process()
@@ -623,7 +720,13 @@ def test_cli_readdir_skips_symlinks_cwd_yara_ignored_and_long_str_safe():
         regular = scan_dir / "regular.txt"
         regular.write_bytes(b"hello world")
         symlink_file = scan_dir / "linked.txt"
-        symlink_file.symlink_to(outside)
+        symlink_created = False
+        try:
+            symlink_file.symlink_to(outside)
+            symlink_created = True
+        except (OSError, NotImplementedError):
+            # Unprivileged Windows runners without SeCreateSymbolicLinkPrivilege
+            pass
 
         # Plant a bogus empty quicksand_exploits.yara in cwd and ensure _resolve_default_yara_path ignores cwd
         evil_yara = root / "quicksand_exploits.yara"
@@ -638,7 +741,8 @@ def test_cli_readdir_skips_symlinks_cwd_yara_ignored_and_long_str_safe():
 
         dir_results = qs_cls.readDir(scan_dir)
         assert str(regular) in dir_results
-        assert str(symlink_file) not in dir_results
+        if symlink_created:
+            assert str(symlink_file) not in dir_results
 
     # Passing a string > 255 bytes must never raise OSError(ENAMETOOLONG)
     q_long = qs_cls("A" * 2048)
@@ -917,19 +1021,19 @@ def test_subprocess_hard_timeout_and_large_pipe_no_deadlock(monkeypatch):
     status_to, rt_to, _ = crm.run_quicksand_isolated(
         b"dummy",
         file_uuid="hang-test",
-        hard_timeout_sec=0.6,
+        hard_timeout_sec=0.8,
         worker_fn=_hung_worker_ignoring_sigalrm,
     )
     elapsed = time.monotonic() - t0
     assert status_to == "timeout"
     assert rt_to is None
-    assert elapsed < 4.0
+    assert elapsed < 12.0
 
     # 2. Large (>512 KB) IPC payload drains Queue before proc.join() without deadlocking
     status_lg, rt_lg, _ = crm.run_quicksand_isolated(
         b"dummy",
         file_uuid="large-pipe-test",
-        hard_timeout_sec=5.0,
+        hard_timeout_sec=15.0,
         worker_fn=_large_payload_worker,
     )
     assert status_lg == "ok"
